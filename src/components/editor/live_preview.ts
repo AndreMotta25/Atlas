@@ -11,12 +11,11 @@ import { syntaxTree } from '@codemirror/language';
 import type { SyntaxNodeRef } from '@lezer/common';
 
 /**
- * Live Preview para o editor Atlas (estilo Obsidian).
+ * Live Preview para o editor Atlas.
  *
  * Regras:
  * - Esconde a marcação (##, **, *, `, [], (), >) e aplica tipografia.
- * - Na linha onde o cursor está, NADA é decorado — o usuário vê o markdown cru
- *   pra poder editar (mesmo comportamento do Obsidian Live Preview).
+ * - O preview é aplicado em TODAS as linhas, inclusive na linha ativa.
  * - Wiki-links ([[pagina]]) e tags (#tag) não são parseados pela gramática
  *   padrão; tratamos via regex em texto "livre".
  */
@@ -124,31 +123,12 @@ function decorateQuote(ref: SyntaxNodeRef, decos: Range<Decoration>[]) {
   decos.push(Decoration.mark({ class: 'atlas-quote' }).range(ref.from, ref.to));
 }
 
-// ─── Cursor line detection ───────────────────────────────────────
-
-function cursorLineRange(state: EditorState): { from: number; to: number } {
-  const line = state.doc.lineAt(state.selection.main.head);
-  return { from: line.from, to: line.to };
-}
-
-function overlapsCursorLine(
-  from: number,
-  to: number,
-  cursor: { from: number; to: number },
-): boolean {
-  return !(to < cursor.from || from > cursor.to);
-}
-
 // ─── Wiki-links & tags (regex pass) ──────────────────────────────
 
 const WIKI_LINK_RE = /\[\[([^\]\n]+)\]\]/g;
 const TAG_RE = /(^|[\s(])#([a-zA-Z][\w/-]*)/g;
 
-function decorateWikiLinksAndTags(
-  view: EditorView,
-  decos: Range<Decoration>[],
-  cursor: { from: number; to: number },
-) {
+function decorateWikiLinksAndTags(view: EditorView, decos: Range<Decoration>[]) {
   for (const { from, to } of view.visibleRanges) {
     const text = view.state.doc.sliceString(from, to);
     let m: RegExpExecArray | null;
@@ -157,7 +137,6 @@ function decorateWikiLinksAndTags(
     while ((m = WIKI_LINK_RE.exec(text))) {
       const start = from + m.index;
       const end = start + m[0].length;
-      if (overlapsCursorLine(start, end, cursor)) continue;
       decos.push(Decoration.mark({ class: 'atlas-wikilink' }).range(start, end));
     }
 
@@ -165,7 +144,6 @@ function decorateWikiLinksAndTags(
     while ((m = TAG_RE.exec(text))) {
       const tagStart = from + m.index + m[1].length;
       const tagEnd = tagStart + m[2].length + 1; // include the '#'
-      if (overlapsCursorLine(tagStart, tagEnd, cursor)) continue;
       decos.push(Decoration.mark({ class: 'atlas-tag' }).range(tagStart, tagEnd));
     }
   }
@@ -176,17 +154,12 @@ function decorateWikiLinksAndTags(
 function buildDecorations(view: EditorView): DecorationSet {
   const decos: Range<Decoration>[] = [];
   const state = view.state;
-  const cursor = cursorLineRange(state);
 
   for (const { from, to } of view.visibleRanges) {
     syntaxTree(state).iterate({
       from,
       to,
       enter: (ref) => {
-        if (overlapsCursorLine(ref.from, ref.to, cursor)) {
-          return; // skip cursor line entirely — raw markdown for editing
-        }
-
         const heading = HEADING_RE.exec(ref.name);
         if (heading) {
           decorateHeading(state, ref, Number(heading[1]), decos);
@@ -210,7 +183,7 @@ function buildDecorations(view: EditorView): DecorationSet {
     });
   }
 
-  decorateWikiLinksAndTags(view, decos, cursor);
+  decorateWikiLinksAndTags(view, decos);
 
   return Decoration.set(decos, true);
 }
