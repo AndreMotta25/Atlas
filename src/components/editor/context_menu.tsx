@@ -1,0 +1,77 @@
+import { useEffect, useRef } from 'react';
+
+export interface MenuSeparator {
+  type: 'separator';
+}
+
+export interface MenuItemDef {
+  type: 'item';
+  label: string;
+  shortcut?: string;
+  onSelect: () => void;
+}
+
+export type MenuEntry = MenuItemDef | MenuSeparator;
+
+interface ContextMenuProps {
+  x: number;
+  y: number;
+  items: MenuEntry[];
+  onClose: () => void;
+}
+
+export const ContextMenu: React.FC<ContextMenuProps> = ({ x, y, items, onClose }) => {
+  const ref = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const handlePointer = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) onClose();
+    };
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('mousedown', handlePointer);
+    window.addEventListener('keydown', handleKey);
+    return () => {
+      window.removeEventListener('mousedown', handlePointer);
+      window.removeEventListener('keydown', handleKey);
+    };
+  }, [onClose]);
+
+  // Clamp position so the menu stays inside the window.
+  const maxX = window.innerWidth - 240;
+  const maxY = window.innerHeight - items.length * 32 - 16;
+  const left = Math.min(x, Math.max(8, maxX));
+  const top = Math.min(y, Math.max(8, maxY));
+
+  return (
+    <div
+      ref={ref}
+      role="menu"
+      style={{ left, top }}
+      className="fixed z-50 min-w-[220px] bg-white border border-slate-200 rounded-lg shadow-lg py-1 text-sm"
+    >
+      {items.map((entry, i) => {
+        if (entry.type === 'separator') {
+          return <div key={`sep-${i}`} className="h-px bg-slate-200 my-1" />;
+        }
+        return (
+          <button
+            key={entry.label}
+            role="menuitem"
+            onClick={() => {
+              entry.onSelect();
+              onClose();
+            }}
+            className="w-full text-left px-3 py-1.5 hover:bg-slate-100 flex items-center justify-between gap-4"
+          >
+            <span>{entry.label}</span>
+            {entry.shortcut && (
+              <span className="text-xs text-slate-400">{entry.shortcut}</span>
+            )}
+          </button>
+        );
+      })}
+    </div>
+  );
+};
