@@ -50,11 +50,11 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({ x, y, items, onClose }
       ref={ref}
       role="menu"
       style={{ left, top }}
-      className="fixed z-50 min-w-[220px] bg-white border border-slate-200 rounded-lg shadow-lg py-1 text-sm"
+      className="fixed z-50 min-w-[220px] bg-card border border-border rounded-lg shadow-lg dark:shadow-2xl py-1 text-sm"
     >
       {items.map((entry, i) => {
         if (entry.type === 'separator') {
-          return <div key={`sep-${i}`} className="h-px bg-slate-200 my-1" />;
+          return <div key={`sep-${i}`} className="h-px bg-border my-1" />;
         }
         return (
           <button
@@ -64,16 +64,16 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({ x, y, items, onClose }
               entry.onSelect();
               onClose();
             }}
-            className="w-full text-left px-3 py-1.5 hover:bg-slate-100 flex items-center justify-between gap-4"
+            className="w-full text-left px-3 py-1.5 hover:bg-accent flex items-center justify-between gap-4"
           >
             <span className="flex items-center gap-2.5">
               {entry.icon && (
-                <span className="w-4 h-4 text-slate-500 shrink-0" dangerouslySetInnerHTML={{ __html: entry.icon }} />
+                <span className="w-4 h-4 text-muted-foreground shrink-0" dangerouslySetInnerHTML={{ __html: entry.icon }} />
               )}
               <span>{entry.label}</span>
             </span>
             {entry.shortcut && (
-              <span className="text-xs text-slate-400">{entry.shortcut}</span>
+              <span className="text-xs text-muted-foreground">{entry.shortcut}</span>
             )}
           </button>
         );

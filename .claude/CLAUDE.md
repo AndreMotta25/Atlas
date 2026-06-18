@@ -13,7 +13,7 @@ Aplicação desktop construída com Electron, usando Webpack como bundler e Type
 | **Webpack**        | Module bundler                    |
 | **Electron Forge** | Build, package e distribuição     |
 | **React**          | Interfaces de usuário             |
-| **TailwindCSS**    | Estilização utilitária            |
+| **TailwindCSS v4** | Estilização utilitária (tema via `@theme`) |
 
 ---
 
@@ -54,9 +54,9 @@ my-app/
 │   └── renderer.tsx                    # Entry point — Renderer Process
 ├── forge.config.ts
 ├── tsconfig.json
-├── tailwind.config.js
-├── postcss.config.js
+├── postcss.config.mjs               # Plugin @tailwindcss/postcss (v4 — sem tailwind.config.js)
 ├── webpack.main.config.ts
+├── webpack.preload.config.ts        # Config isolada do preload
 ├── webpack.renderer.config.ts
 ├── webpack.plugins.ts
 └── webpack.rules.ts
@@ -75,6 +75,19 @@ npm run lint        # ESLint
 ```
 
 ---
+
+## Fluxo obrigatório — sem exceções
+
+Antes de criar qualquer arquivo, escrever código ou executar comandos:
+
+1. Execute `find .claude\skills -name "SKILL.md"` para listar as skills disponíveis
+2. Leia o conteúdo de cada SKILL.md relevante com `cat`
+3. Só então comece a produzir
+
+Se não houver skills relevantes, prossiga normalmente.
+
+**Nunca comece a produzir sem antes executar o passo 1.**
+Não há exceções para essa regra, mesmo que você acredite conhecer a tarefa.
 
 ## Arquitetura Electron
 
@@ -111,20 +124,68 @@ O Renderer **não pode** fazer `fetch()` direto para APIs externas. Toda chamada
 
 ---
 
-## Setup Inicial (React + Tailwind)
+## Setup Inicial (React + Tailwind v4)
 
-> 📖 **Ver skill:** `.claude/skills/electron-react-tailwind-setup.md`
+> 📖 **Ver skills:** `.claude/skills/electron-react-tailwind-setup.md`, `.claude/skills/dark-mode-tailwind-v4.md`
 
 Checklist de configuração em ordem obrigatória:
 
 1. `npm install react react-dom && npm install -D @types/react @types/react-dom`
 2. Adicionar `"jsx": "react-jsx"` ao `tsconfig.json`
 3. Atualizar `forge.config.ts` — `js` do entryPoint aponta para `renderer.tsx`
-4. `npm install -D tailwindcss@3 postcss autoprefixer && npx tailwindcss init`
-5. Configurar `tailwind.config.js` e criar `postcss.config.js`
-6. Adicionar diretivas `@tailwind` ao `index.css`
+4. `npm install -D tailwindcss@4 @tailwindcss/postcss postcss` (sem `tailwind.config.js`)
+5. Configurar `postcss.config.mjs` com o plugin `@tailwindcss/postcss`
+6. No `index.css`: `@import 'tailwindcss';` (não usar `@tailwind base/components/utilities`)
 7. `npm install --save-dev postcss-loader`
 8. Atualizar `webpack.renderer.config.ts` com `postcss-loader` (ordem: postcss → css → style)
+
+### ⚠️ Tailwind v4 — contrato de tema (regra de ouro)
+
+Em v4 o `tailwind.config.js` foi removido. **Toda cor/utility registrada para o Tailwind deve ser declarada dentro de `@theme`** no CSS. Variáveis soltas em `:root`/`.dark` **não** geram utilidades — só existem como CSS variables em runtime.
+
+Para suportar dark mode com troca em runtime via classe `.dark` no `<html>`, usar `@theme inline` religando as variáveis-base:
+
+```css
+@import 'tailwindcss';
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* Religa as variáveis-base ao Tailwind — gera utilidades e troca com .dark */
+@theme inline {
+  --color-background:         var(--background);
+  --color-border:             var(--border);
+  --color-foreground:         var(--foreground);
+  --color-muted-foreground:   var(--muted-foreground);
+  /* …demais tokens… */
+}
+
+/* Valores concretos por tema */
+:root {
+  --background: #ffffff;
+  --border:     #e2e8f0;
+  --foreground: #0f172a;
+  /* … */
+}
+
+.dark {
+  --background: #1e1e1e;
+  --border:     #333333;
+  --foreground: #dcddde;
+  /* … */
+}
+```
+
+Agora `bg-background`, `border-border`, `text-foreground` etc. são geradas e refletem `.dark` automaticamente.
+
+**Sintomas de tema mal-configurado (tokens fora do `@theme`):**
+- Utilidades como `border-border`/`bg-background` não aplicam cor
+- Bordas aparecem em `currentColor` (quase branco em dark mode)
+- Cores não trocam ao aplicar `.dark`
+
+Se ver qualquer um desses, verificar se o bloco `@theme inline` existe e cobre o token.
+
+### Integração com `nativeTheme` (Electron)
+
+A classe `.dark` no `<html>` deve espelhar o `nativeTheme` do Main. Ver skill `dark-mode-electron-tailwind-v4.md` para o fluxo completo: handler IPC `theme:*` → `useTheme()` hook → aplicação da classe no `document.documentElement`.
 
 ---
 
@@ -400,6 +461,7 @@ if (!gotLock) {
 | Arquivo                      | Responsabilidade                      |
 | ---------------------------- | ------------------------------------- |
 | `webpack.main.config.ts`     | Main process                          |
+| `webpack.preload.config.ts`  | Preload script (bundle isolado)       |
 | `webpack.renderer.config.ts` | Renderer process (inclui CSS/PostCSS) |
 | `webpack.rules.ts`           | Regras compartilhadas                 |
 | `webpack.plugins.ts`         | Plugins compartilhados                |
@@ -477,12 +539,23 @@ const win = new BrowserWindow({
 });
 ```
 
-**Tailwind não aplica estilos:**
+**Tailwind não aplica estilos (v4):**
 
-1. `postcss.config.js` existe na raiz?
-2. `tailwind.config.js` tem `content: ['./src/**/*.{js,ts,jsx,tsx}']`?
+1. `postcss.config.mjs` existe na raiz e usa o plugin `@tailwindcss/postcss`?
+2. `index.css` começa com `@import 'tailwindcss';` (não `@tailwind base…`)?
 3. `index.css` importado no `renderer.tsx`?
-4. `postcss-loader` instalado e na ordem correta no Webpack?
+4. `postcss-loader` instalado e na ordem correta no Webpack (postcss → css → style)?
+
+**Bordas/cores aparecem erradas no dark mode (brancas ou sem troca):**
+
+Os tokens estão fora do `@theme`. Verificar:
+
+1. Existe bloco `@theme inline { --color-*: var(--*) }` no `index.css`?
+2. Cada token usado em utilidades (`bg-background`, `border-border`, `text-foreground`…) está mapeado nesse bloco?
+3. A classe `.dark` está aplicada ao `document.documentElement` (`<html class="dark">`)?
+4. Os valores concretos estão em `:root`/`.dark`, não dentro do `@theme`?
+
+Sem `@theme`, utilidades como `border-border` não são geradas → fallback para `currentColor` → bordas em cor de texto (quase branco em dark mode).
 
 **`safeStorage.isEncryptionAvailable()` retorna `false` no Linux:**
 Sistema sem `libsecret`, kwallet ou gnome-keyring instalado. Instalar `gnome-libsecret`:
@@ -523,7 +596,9 @@ Referências técnicas em `.claude/skills/`:
 | Skill                                | Cobre                                                                                                                        |
 | ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------- |
 | **electron-ipc-typescript.md**       | IPC type-safe (tipos, Zod, preload, hooks, CSP, broadcasting, performance)                                                   |
-| **electron-react-tailwind-setup.md** | React + TailwindCSS v3 + PostCSS + Webpack passo a passo                                                                     |
+| **electron-react-tailwind-setup.md** | React + TailwindCSS v4 + PostCSS + Webpack passo a passo                                                                     |
+| **dark-mode-tailwind-v4.md**         | `@theme inline`, CSS variables semânticas, `@custom-variant dark`, padrão shadcn/ui                                          |
+| **dark-mode-electron-tailwind-v4.md** | Integração `nativeTheme` ↔ classe `.dark` via IPC + `useTheme` hook                                                         |
 | **electron-security-hardening.md**   | CSP, `safeStorage`, `shell.openExternal`, permissions, navigation guard, DevTools, electronegativity                         |
 | **electron-native-apis.md**          | Single instance, auto-update, deep links, `nativeTheme`, `powerMonitor`, Tray, `globalShortcut`, Notification, `app.getPath` |
 | **react-solid-typescript.md**        | Princípios SOLID aplicados a componentes React com TypeScript                                                                |

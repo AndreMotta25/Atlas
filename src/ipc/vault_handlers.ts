@@ -37,4 +37,14 @@ export const registerVaultHandlers = (): void => {
     await VaultManager.writePage(relPath, content);
     return { success: true };
   });
+
+  ipcMain.handle(createChannel('vault', 'create-folder'), async (_e, relPath: string) => {
+    await VaultManager.createFolder(relPath);
+    return { success: true };
+  });
+
+  ipcMain.handle(createChannel('vault', 'move-page'), async (_e, fromPath: string, toPath: string) => {
+    await VaultManager.movePage(fromPath, toPath);
+    return { success: true };
+  });
 };

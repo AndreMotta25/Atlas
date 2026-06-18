@@ -1,5 +1,6 @@
-import { app, BrowserWindow, session } from 'electron';
+import { app, BrowserWindow, nativeTheme, session } from 'electron';
 import { registerAllHandlers } from './ipc';
+import { createChannel } from './types';
 import { ConfigStore } from './vault/config_store';
 import { initVaultFromConfig, VaultManager } from './vault/manager';
 
@@ -71,6 +72,20 @@ if (!gotLock) {
 
   app.whenReady().then(() => {
     registerAllHandlers();
+
+    // Restore persisted theme.
+    const saved = ConfigStore.load().themeMode ?? 'system';
+    nativeTheme.themeSource = saved;
+
+    // Forward OS theme changes to all windows (for system mode).
+    nativeTheme.on('updated', () => {
+      BrowserWindow.getAllWindows().forEach((w) => {
+        w.webContents.send(
+          createChannel('theme', 'changed'),
+          nativeTheme.shouldUseDarkColors,
+        );
+      });
+    });
 
     // Restore persisted vault path.
     initVaultFromConfig(ConfigStore.load().vaultPath);

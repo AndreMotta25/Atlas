@@ -146,11 +146,11 @@ export const EditorPane = () => {
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
-      <div className="px-4 py-2 border-b border-slate-200 flex items-center justify-between text-xs text-slate-500">
+      <div className="px-4 py-2 border-b border-border flex items-center justify-between text-xs text-muted-foreground">
         <span className="truncate">{currentPath ?? 'Nenhuma página selecionada'}</span>
         <span>{dirty ? 'Salvando…' : 'Salvo'}</span>
       </div>
-      <div ref={hostRef} className="flex-1 overflow-auto bg-white" />
+      <div ref={hostRef} className="flex-1 overflow-auto" />
       {menuPos && (
         <ContextMenu
           x={menuPos.x}

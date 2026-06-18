@@ -112,4 +112,5 @@ export interface AppSettings {
   vaultPath: string | null;
   activeProvider: AIProvider;
   defaultModel: string;
+  themeMode: ThemeMode;
 }

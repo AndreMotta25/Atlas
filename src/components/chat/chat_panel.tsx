@@ -33,14 +33,14 @@ export const ChatPanel = () => {
   };
 
   return (
-    <div className="flex flex-col h-full bg-white">
-      <div className="px-3 py-2 border-b border-slate-200 text-xs font-semibold uppercase tracking-wide text-slate-500">
+    <div className="flex flex-col h-full bg-background">
+      <div className="px-3 py-2 border-b border-border text-xs font-semibold uppercase tracking-wide text-muted-foreground">
         Atlas IA
       </div>
 
       <div ref={scrollRef} className="flex-1 overflow-auto p-3 space-y-3">
         {messages.length === 0 && (
-          <p className="text-xs text-slate-400 text-center mt-8">
+          <p className="text-xs text-muted-foreground opacity-60 text-center mt-8">
             Converse com o Atlas. Configure sua API key da DeepSeek nas configurações ⚙
           </p>
         )}
@@ -48,33 +48,33 @@ export const ChatPanel = () => {
           <Message key={m.id} message={m} streaming={streaming && m.id === activeRequestId} />
         ))}
         {error && (
-          <div className="text-xs bg-red-50 border border-red-200 text-red-700 rounded px-2 py-1">
+          <div className="text-xs bg-destructive/10 border border-destructive/30 text-destructive rounded px-2 py-1">
             {error}
           </div>
         )}
       </div>
 
-      <form onSubmit={handleSubmit} className="border-t border-slate-200 p-2 flex gap-2">
+      <form onSubmit={handleSubmit} className="border-t border-border p-2 flex gap-2">
         <textarea
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder="Escreva uma mensagem…"
           rows={2}
-          className="flex-1 resize-none text-sm px-2 py-1 border border-slate-300 rounded focus:outline-none focus:border-blue-500"
+          className="flex-1 resize-none text-sm px-2 py-1 border border-input bg-card text-foreground rounded focus:outline-none focus:border-primary"
         />
         {streaming ? (
           <button
             type="button"
             onClick={() => void cancel()}
-            className="px-3 py-1 bg-red-100 text-red-700 rounded text-sm hover:bg-red-200"
+            className="px-3 py-1 bg-destructive/20 text-destructive rounded text-sm hover:bg-destructive/30"
           >
             Parar
           </button>
         ) : (
           <button
             type="submit"
-            className="px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
+            className="px-3 py-1 bg-primary text-primary-foreground rounded text-sm hover:brightness-90"
           >
             Enviar
           </button>

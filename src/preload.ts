@@ -38,6 +38,12 @@ const electronAPI = {
   setThemeSource: (source: 'system' | 'light' | 'dark') =>
     ipcRenderer.invoke(createChannel('theme', 'set-source'), source),
   shouldUseDarkColors: () => ipcRenderer.invoke(createChannel('theme', 'should-use-dark-colors')),
+  onThemeChanged: (listener: Listener<boolean>): Unsubscribe => {
+    const channel = createChannel('theme', 'changed');
+    const wrapped = (_e: unknown, payload: boolean) => listener(payload);
+    ipcRenderer.on(channel, wrapped);
+    return () => ipcRenderer.removeListener(channel, wrapped);
+  },
 
   // ── Notification ──
   showNotification: (title: string, body: string) =>
@@ -52,6 +58,10 @@ const electronAPI = {
       ipcRenderer.invoke(createChannel('vault', 'read-page'), relPath),
     writePage: (relPath: string, content: string): Promise<{ success: boolean }> =>
       ipcRenderer.invoke(createChannel('vault', 'write-page'), relPath, content),
+    createFolder: (relPath: string): Promise<{ success: boolean }> =>
+      ipcRenderer.invoke(createChannel('vault', 'create-folder'), relPath),
+    movePage: (fromPath: string, toPath: string): Promise<{ success: boolean }> =>
+      ipcRenderer.invoke(createChannel('vault', 'move-page'), fromPath, toPath),
     onChanged: (listener: Listener<VaultChangeEvent>): Unsubscribe => {
       const channel = createChannel('vault', 'changed');
       const wrapped = (_e: unknown, payload: VaultChangeEvent) => listener(payload);

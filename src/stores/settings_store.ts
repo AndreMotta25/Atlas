@@ -6,6 +6,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   vaultPath: null,
   activeProvider: 'deepseek',
   defaultModel: 'deepseek-chat',
+  themeMode: 'system',
 };
 
 interface SettingsState {

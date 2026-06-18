@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react';
 import { api } from '../../lib/api';
 import { useSettingsStore } from '../../stores/settings_store';
 import { useVaultStore } from '../../stores/vault_store';
-import type { AIProvider } from '../../types';
+import { useTheme } from '../../hooks/use_theme';
+import type { AIProvider, ThemeMode } from '../../types';
 
 interface SettingsModalProps {
   onClose: () => void;
@@ -22,6 +23,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
   const deleteApiKey = useSettingsStore((s) => s.deleteApiKey);
   const loadSettings = useSettingsStore((s) => s.load);
   const loadTree = useVaultStore((s) => s.loadTree);
+
+  const { setTheme } = useTheme();
 
   const [keyDraft, setKeyDraft] = useState('');
   const [hasKey, setHasKey] = useState<boolean | null>(null);
@@ -79,12 +82,18 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
     }
   };
 
+  const THEME_OPTIONS: { id: ThemeMode; label: string }[] = [
+    { id: 'light', label: 'Claro' },
+    { id: 'dark', label: 'Escuro' },
+    { id: 'system', label: 'Sistema' },
+  ];
+
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-lg max-h-[80vh] overflow-auto">
-        <header className="flex items-center justify-between px-5 py-3 border-b border-slate-200">
-          <h2 className="text-lg font-semibold">Configurações</h2>
-          <button onClick={onClose} className="text-slate-500 hover:text-slate-800">
+      <div className="bg-card rounded-lg shadow-xl dark:shadow-2xl w-full max-w-lg max-h-[80vh] overflow-auto">
+        <header className="flex items-center justify-between px-5 py-3 border-b border-border">
+          <h2 className="text-lg font-semibold text-foreground">Configurações</h2>
+          <button onClick={onClose} className="text-muted-foreground hover:text-foreground">
             ✕
           </button>
         </header>
@@ -92,21 +101,41 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
         <div className="p-5 space-y-5">
           {/* Vault */}
           <section>
-            <h3 className="text-sm font-semibold text-slate-700 mb-1">Vault</h3>
-            <p className="text-xs text-slate-500 mb-2 truncate">
+            <h3 className="text-sm font-semibold text-foreground mb-1">Vault</h3>
+            <p className="text-xs text-muted-foreground mb-2 truncate">
               {settings.vaultPath ?? '— nenhum —'}
             </p>
             <button
               onClick={handleChangeVault}
-              className="px-3 py-1 bg-slate-100 hover:bg-slate-200 rounded text-sm"
+              className="px-3 py-1 bg-muted hover:bg-accent rounded text-sm text-foreground"
             >
               Trocar vault
             </button>
           </section>
 
+          {/* Tema */}
+          <section>
+            <h3 className="text-sm font-semibold text-foreground mb-2">Tema</h3>
+            <div className="grid grid-cols-3 gap-2">
+              {THEME_OPTIONS.map((opt) => (
+                <button
+                  key={opt.id}
+                  onClick={() => void setTheme(opt.id)}
+                  className={`px-3 py-2 rounded text-sm border ${
+                    settings.themeMode === opt.id
+                      ? 'border-primary bg-accent text-accent-foreground'
+                      : 'border-border hover:bg-accent text-foreground'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </section>
+
           {/* Provider */}
           <section>
-            <h3 className="text-sm font-semibold text-slate-700 mb-1">Provider ativo</h3>
+            <h3 className="text-sm font-semibold text-foreground mb-1">Provider ativo</h3>
             <div className="grid grid-cols-2 gap-2">
               {PROVIDERS.map((p) => (
                 <button
@@ -114,22 +143,22 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                   onClick={() => void handleProviderChange(p.id)}
                   className={`px-3 py-2 rounded text-sm border ${
                     settings.activeProvider === p.id
-                      ? 'border-blue-500 bg-blue-50 text-blue-700'
-                      : 'border-slate-200 hover:bg-slate-50'
+                      ? 'border-primary bg-accent text-accent-foreground'
+                      : 'border-border hover:bg-accent text-foreground'
                   }`}
                 >
                   {p.label}
                 </button>
               ))}
             </div>
-            <p className="text-xs text-slate-500 mt-2">
+            <p className="text-xs text-muted-foreground mt-2">
               Apenas DeepSeek está ativo no MVP. Os demais providers entram na Fase 4.
             </p>
           </section>
 
           {/* Model */}
           <section>
-            <label className="block text-sm font-semibold text-slate-700 mb-1">
+            <label className="block text-sm font-semibold text-foreground mb-1">
               Modelo padrão
             </label>
             <input
@@ -139,16 +168,16 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
               placeholder={
                 PROVIDERS.find((p) => p.id === settings.activeProvider)?.modelPlaceholder
               }
-              className="w-full text-sm px-2 py-1 border border-slate-300 rounded"
+              className="w-full text-sm px-2 py-1 border border-input bg-card text-foreground rounded"
             />
           </section>
 
           {/* API Key */}
           <section>
-            <h3 className="text-sm font-semibold text-slate-700 mb-1">
+            <h3 className="text-sm font-semibold text-foreground mb-1">
               API Key — {settings.activeProvider}
             </h3>
-            <p className="text-xs text-slate-500 mb-2">
+            <p className="text-xs text-muted-foreground mb-2">
               {hasKey === null
                 ? 'verificando…'
                 : hasKey
@@ -161,32 +190,32 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                 value={keyDraft}
                 onChange={(e) => setKeyDraft(e.target.value)}
                 placeholder="Cole aqui a API key"
-                className="flex-1 text-sm px-2 py-1 border border-slate-300 rounded"
+                className="flex-1 text-sm px-2 py-1 border border-input bg-card text-foreground rounded"
               />
               <button
                 onClick={handleSaveKey}
-                className="px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
+                className="px-3 py-1 bg-primary text-primary-foreground rounded text-sm hover:brightness-90"
               >
                 Salvar
               </button>
               {hasKey && (
                 <button
                   onClick={handleDeleteKey}
-                  className="px-3 py-1 bg-red-100 text-red-700 rounded text-sm hover:bg-red-200"
+                  className="px-3 py-1 bg-destructive/20 text-destructive rounded text-sm hover:bg-destructive/30"
                 >
                   Remover
                 </button>
               )}
             </div>
-            {statusMsg && <p className="text-xs text-green-700 mt-2">{statusMsg}</p>}
-            {errorMsg && <p className="text-xs text-red-700 mt-2">{errorMsg}</p>}
+            {statusMsg && <p className="text-xs text-success mt-2">{statusMsg}</p>}
+            {errorMsg && <p className="text-xs text-destructive mt-2">{errorMsg}</p>}
           </section>
         </div>
 
-        <footer className="px-5 py-3 border-t border-slate-200 flex justify-end">
+        <footer className="px-5 py-3 border-t border-border flex justify-end">
           <button
             onClick={onClose}
-            className="px-4 py-1 bg-slate-800 text-white rounded text-sm hover:bg-slate-900"
+            className="px-4 py-1 bg-muted text-foreground rounded text-sm hover:bg-accent"
           >
             Fechar
           </button>

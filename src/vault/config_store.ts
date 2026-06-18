@@ -7,6 +7,7 @@ const DEFAULTS: AppSettings = {
   vaultPath: null,
   activeProvider: 'deepseek',
   defaultModel: 'deepseek-chat',
+  themeMode: 'system',
 };
 
 const FILENAME = 'config.json';

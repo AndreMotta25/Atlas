@@ -93,6 +93,18 @@ class VaultManagerClass {
     await fsp.writeFile(abs, content, 'utf-8');
   }
 
+  async createFolder(relPath: string): Promise<void> {
+    const abs = this.resolve(relPath);
+    await fsp.mkdir(abs, { recursive: true });
+  }
+
+  async movePage(fromRelPath: string, toRelPath: string): Promise<void> {
+    const absFrom = this.resolve(fromRelPath);
+    const absTo = this.resolve(toRelPath);
+    await fsp.mkdir(path.dirname(absTo), { recursive: true });
+    await fsp.rename(absFrom, absTo);
+  }
+
   private startWatch(): void {
     if (!this.root) return;
     // eslint-disable-next-line import/no-named-as-default-member
