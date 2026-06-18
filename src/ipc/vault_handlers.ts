@@ -47,4 +47,9 @@ export const registerVaultHandlers = (): void => {
     await VaultManager.movePage(fromPath, toPath);
     return { success: true };
   });
+
+  ipcMain.handle(createChannel('vault', 'rename'), async (_e, oldPath: string, newPath: string) => {
+    await VaultManager.rename(oldPath, newPath);
+    return { success: true };
+  });
 };

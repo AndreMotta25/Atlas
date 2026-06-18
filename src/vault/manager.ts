@@ -105,6 +105,10 @@ class VaultManagerClass {
     await fsp.rename(absFrom, absTo);
   }
 
+  async rename(oldRelPath: string, newRelPath: string): Promise<void> {
+    await this.movePage(oldRelPath, newRelPath);
+  }
+
   private startWatch(): void {
     if (!this.root) return;
     // eslint-disable-next-line import/no-named-as-default-member

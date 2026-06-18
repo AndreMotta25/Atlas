@@ -62,6 +62,8 @@ const electronAPI = {
       ipcRenderer.invoke(createChannel('vault', 'create-folder'), relPath),
     movePage: (fromPath: string, toPath: string): Promise<{ success: boolean }> =>
       ipcRenderer.invoke(createChannel('vault', 'move-page'), fromPath, toPath),
+    rename: (oldPath: string, newPath: string): Promise<{ success: boolean }> =>
+      ipcRenderer.invoke(createChannel('vault', 'rename'), oldPath, newPath),
     onChanged: (listener: Listener<VaultChangeEvent>): Unsubscribe => {
       const channel = createChannel('vault', 'changed');
       const wrapped = (_e: unknown, payload: VaultChangeEvent) => listener(payload);
