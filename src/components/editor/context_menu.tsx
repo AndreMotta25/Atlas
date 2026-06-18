@@ -8,6 +8,7 @@ export interface MenuItemDef {
   type: 'item';
   label: string;
   shortcut?: string;
+  icon?: string;
   onSelect: () => void;
 }
 
@@ -65,7 +66,12 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({ x, y, items, onClose }
             }}
             className="w-full text-left px-3 py-1.5 hover:bg-slate-100 flex items-center justify-between gap-4"
           >
-            <span>{entry.label}</span>
+            <span className="flex items-center gap-2.5">
+              {entry.icon && (
+                <span className="w-4 h-4 text-slate-500 shrink-0" dangerouslySetInnerHTML={{ __html: entry.icon }} />
+              )}
+              <span>{entry.label}</span>
+            </span>
             {entry.shortcut && (
               <span className="text-xs text-slate-400">{entry.shortcut}</span>
             )}
