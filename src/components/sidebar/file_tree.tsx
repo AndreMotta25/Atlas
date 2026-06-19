@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '../../lib/api';
 import { useVaultStore } from '../../stores/vault_store';
+import { useChatStore } from '../../stores/chat_store';
 import { ContextMenu } from '../editor/context_menu';
 import type { MenuEntry } from '../editor/context_menu';
 import type { VaultTree } from '../../types';
@@ -307,8 +308,31 @@ export const FileTree: React.FC = () => {
     await loadTree();
   };
 
+  const handleSendToAtlas = async () => {
+    if (!ctxMenu) return;
+    const path = ctxMenu.path;
+    setCtxMenu(null);
+    try {
+      await openPage(path);
+      const send = useChatStore.getState().send;
+      await send(`Analise a página **${path}**.`);
+    } catch (err) {
+      console.error('Falha ao carregar página para o Atlas:', err);
+    }
+  };
+
   const contextMenuItems: MenuEntry[] = ctxMenu
     ? [
+        ...(ctxMenu.path.endsWith('.md')
+          ? [
+              {
+                type: 'item' as const,
+                label: 'Enviar para o Atlas',
+                icon: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4"><circle cx="12" cy="12" r="10"/><path d="M16 12l-4 4-4-4M12 8v8"/></svg>`,
+                onSelect: handleSendToAtlas,
+              },
+            ]
+          : []),
         {
           type: 'item',
           label: 'Renomear',

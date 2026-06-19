@@ -118,9 +118,6 @@ class AIOrchestratorClass {
       });
 
       for await (const part of stream.fullStream) {
-        if (part.type !== 'text-delta') {
-          console.warn(`[Orchestrator] part.type = ${part.type}`, JSON.stringify(part).slice(0, 200));
-        }
         switch (part.type) {
           case 'text-delta': {
             result.assistantText += part.text;
@@ -128,7 +125,6 @@ class AIOrchestratorClass {
             break;
           }
           case 'tool-call': {
-            console.warn('[Orchestrator] tool-call received:', part.toolName, 'input:', (part as { input?: unknown }).input);
             if (isWriteToolName(part.toolName)) {
               const pending: PendingToolCall = {
                 requestId,
@@ -139,7 +135,6 @@ class AIOrchestratorClass {
                   : {},
                 status: 'pending',
               };
-              console.warn('[Orchestrator] pending write tool:', pending);
               result.pendingToolCalls.push(pending);
               sinks.toolPending?.(pending);
             }
@@ -178,11 +173,8 @@ class AIOrchestratorClass {
 
       // If we have pending write tool calls, do NOT emit done:true — the renderer
       // keeps `streaming: true` so the UI stays engaged while waiting for confirm.
-      console.warn('[Orchestrator] loop ended. pendingToolCalls.length =', result.pendingToolCalls.length, 'assistantText length:', result.assistantText.length);
       if (result.pendingToolCalls.length === 0) {
         sinks.chunk({ requestId, delta: '', done: true });
-      } else {
-        console.warn('[Orchestrator] NOT emitting done:true — waiting for user confirmation');
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
