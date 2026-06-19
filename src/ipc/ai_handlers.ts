@@ -64,10 +64,13 @@ const runTurnAndStore = async (
       controller.signal,
     );
 
+    console.warn('[AIHandler] runTurn returned. pendingToolCalls.length =', result.pendingToolCalls.length, 'assistantText length:', result.assistantText.length);
+
     // If we captured pending write tool calls, register them so tool:confirm /
     // tool:reject can find them later. We also stash the assistant text so the
     // next resume includes it as part of the assistant turn.
     if (result.pendingToolCalls.length > 0) {
+      console.warn('[AIHandler] Storing conversation context with pending write tools');
       for (const pending of result.pendingToolCalls) {
         context.pending.set(pending.toolCallId, pending);
       }

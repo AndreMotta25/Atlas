@@ -105,16 +105,22 @@ class AIOrchestratorClass {
         system: SYSTEM_PROMPT,
         messages: this.toModelMessages(opts.messages),
         tools: TOOLS,
-        // Stop on the first write tool call so we can ask the user for confirmation
-        // before executing it. Read tools have execute() and resolve automatically.
-        stopWhen: (result) =>
-          result.steps.some((step) =>
-            step.toolCalls.some((tc) => isWriteToolName(tc.toolName)),
-          ),
         abortSignal,
+        stopWhen: ({ steps }) => {
+          const lastStep = steps[steps.length - 1];
+          if (!lastStep) return true;
+          // Continue while the model is calling tools that we can auto-execute.
+          // Stop when the model stops calling tools OR calls a write tool
+          // (no execute → needs user confirmation).
+          if (lastStep.finishReason !== 'tool-calls') return true;
+          return lastStep.toolCalls.some((tc) => isWriteToolName(tc.toolName));
+        },
       });
 
       for await (const part of stream.fullStream) {
+        if (part.type !== 'text-delta') {
+          console.warn(`[Orchestrator] part.type = ${part.type}`, JSON.stringify(part).slice(0, 200));
+        }
         switch (part.type) {
           case 'text-delta': {
             result.assistantText += part.text;
@@ -122,6 +128,7 @@ class AIOrchestratorClass {
             break;
           }
           case 'tool-call': {
+            console.warn('[Orchestrator] tool-call received:', part.toolName, 'input:', (part as { input?: unknown }).input);
             if (isWriteToolName(part.toolName)) {
               const pending: PendingToolCall = {
                 requestId,
@@ -132,6 +139,7 @@ class AIOrchestratorClass {
                   : {},
                 status: 'pending',
               };
+              console.warn('[Orchestrator] pending write tool:', pending);
               result.pendingToolCalls.push(pending);
               sinks.toolPending?.(pending);
             }
@@ -170,8 +178,11 @@ class AIOrchestratorClass {
 
       // If we have pending write tool calls, do NOT emit done:true — the renderer
       // keeps `streaming: true` so the UI stays engaged while waiting for confirm.
+      console.warn('[Orchestrator] loop ended. pendingToolCalls.length =', result.pendingToolCalls.length, 'assistantText length:', result.assistantText.length);
       if (result.pendingToolCalls.length === 0) {
         sinks.chunk({ requestId, delta: '', done: true });
+      } else {
+        console.warn('[Orchestrator] NOT emitting done:true — waiting for user confirmation');
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -186,6 +197,11 @@ class AIOrchestratorClass {
    * Convert our ChatMessage[] into ModelMessage[] for streamText. Past assistant
    * turns with toolCalls/toolResults are reconstructed as proper tool-call and
    * tool-result parts so the model retains full context across resume.
+   *
+   * Tool results MUST be emitted as separate messages with role "tool",
+   * otherwise the SDK's convertToLanguageModelPrompt throws
+   * MissingToolResultsError (it only resolves tool calls via "tool"-role
+   * messages, not from parts inside the assistant message).
    */
   private toModelMessages(messages: ChatMessage[]): ModelMessage[] {
     const out: ModelMessage[] = [];
@@ -198,8 +214,9 @@ class AIOrchestratorClass {
         out.push({ role: 'user', content: m.content });
         continue;
       }
-      // assistant — may carry text + tool calls + tool results
-      const parts: Array<ToolCallPart | ToolResultPart | { type: 'text'; text: string }> = [];
+      // assistant — may carry text + tool calls.
+      // Tool results go as *separate* "tool" role messages (see contract above).
+      const parts: Array<ToolCallPart | { type: 'text'; text: string }> = [];
       if (m.content) parts.push({ type: 'text', text: m.content });
       m.toolCalls?.forEach((tc) => {
         parts.push({
@@ -209,26 +226,49 @@ class AIOrchestratorClass {
           input: tc.args,
         });
       });
+      // Read tools (list_pages, read_page) auto-execute during multi-step and
+      // produce tool-result events, but their tool-call events are NOT sent to
+      // the renderer (only write tools get toolPending).  If we emit tool-role
+      // messages for those results without a preceding assistant tool-call, the
+      // DeepSeek API rejects the request.  Create synthetic tool-call parts for
+      // orphan results so the message sequence is valid.
       m.toolResults?.forEach((tr) => {
-        parts.push({
-          type: 'tool-result',
-          toolCallId: tr.toolCallId,
-          toolName: tr.toolName,
-          output: {
-            type: 'json',
-            value: {
-              success: tr.success,
-              path: tr.path,
-              content: tr.content,
-              count: tr.count,
-              error: tr.error,
-              undone: tr.undone,
-            },
-          },
-        });
+        if (!m.toolCalls?.some((tc) => tc.toolCallId === tr.toolCallId)) {
+          parts.push({
+            type: 'tool-call',
+            toolCallId: tr.toolCallId,
+            toolName: tr.toolName,
+            input: {},
+          });
+        }
       });
       const content: AssistantContent = parts.length ? parts : '';
       out.push({ role: 'assistant', content });
+
+      // Emit each tool result as its own "tool" role message.
+      m.toolResults?.forEach((tr) => {
+        out.push({
+          role: 'tool',
+          content: [
+            {
+              type: 'tool-result',
+              toolCallId: tr.toolCallId,
+              toolName: tr.toolName,
+              output: {
+                type: 'json',
+                value: {
+                  success: tr.success,
+                  path: tr.path,
+                  content: tr.content,
+                  count: tr.count,
+                  error: tr.error,
+                  undone: tr.undone,
+                },
+              },
+            },
+          ],
+        });
+      });
     }
     return out;
   }

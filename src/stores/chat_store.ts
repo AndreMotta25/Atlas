@@ -55,13 +55,16 @@ export const useChatStore = create<ChatState>((set, get) => ({
       }
 
       if (chunk.done) {
+        console.warn('[ChatStore] received done:true, setting streaming=false');
         set({ streaming: false, activeRequestId: null });
       }
     });
 
     const offPending = api.ai.onToolPending((pending: PendingToolCall) => {
       const state = get();
+      console.warn('[ChatStore] onToolPending:', pending.toolName, 'requestId:', pending.requestId, 'activeRequestId:', state.activeRequestId);
       if (pending.requestId !== state.activeRequestId) return;
+      console.warn('[ChatStore] Applying tool-call to message:', state.activeRequestId);
       set({
         messages: state.messages.map((m) =>
           m.id === state.activeRequestId
@@ -72,6 +75,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     });
 
     const offResult = api.ai.onToolResult((result: ToolResultPayload) => {
+      console.warn('[ChatStore] onToolResult:', result.toolName, 'success:', result.success, 'toolCallId:', result.toolCallId);
       set((s) => ({
         messages: s.messages.map((m) => {
           if (!m.toolCalls?.some((tc) => tc.toolCallId === result.toolCallId)) {

@@ -53,5 +53,13 @@ export const useVaultStore = create<VaultState>((set, get) => ({
     if (evt.type === 'add' || evt.type === 'unlink' || evt.type === 'addDir' || evt.type === 'unlinkDir') {
       void get().loadTree();
     }
+    // When a page is modified externally (e.g. AI chat edit), reload it
+    // immediately so the editor reflects the change without navigation.
+    if (evt.type === 'change') {
+      const { currentPath } = get();
+      if (currentPath === evt.path) {
+        void get().openPage(currentPath);
+      }
+    }
   },
 }));
