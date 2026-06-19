@@ -170,6 +170,12 @@ const electronAPI = {
   undo: {
     last: (): Promise<UndoResult> => ipcRenderer.invoke(createChannel('undo', 'last')),
   },
+
+  // ── Font loader (bypasses renderer CSP — fetches Google Fonts in main) ──
+  font: {
+    load: (family: string): Promise<{ success: boolean; css?: string; error?: string }> =>
+      ipcRenderer.invoke(createChannel('font', 'load'), family),
+  },
 };
 
 contextBridge.exposeInMainWorld('electronAPI', electronAPI);

@@ -1,21 +1,36 @@
+import { useMemo, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeRaw from 'rehype-raw';
 import type { ChatMessage } from '../../types';
 import { ConfirmCard } from './confirm_card';
 import { ToolResultCard } from './tool_result_card';
+import { parseActions } from './parse_actions';
 import { useChatStore } from '../../stores/chat_store';
 
 interface MessageProps {
   message: ChatMessage;
   streaming?: boolean;
+  /** True when this is the last message in the list — actions only render here. */
+  isLast?: boolean;
 }
 
-export const Message: React.FC<MessageProps> = ({ message, streaming }) => {
+export const Message: React.FC<MessageProps> = ({ message, streaming, isLast }) => {
   const isUser = message.role === 'user';
   const confirmToolCall = useChatStore((s) => s.confirmToolCall);
   const rejectToolCall = useChatStore((s) => s.rejectToolCall);
   const undoLast = useChatStore((s) => s.undoLast);
+  const send = useChatStore((s) => s.send);
+
+  const [actionsUsed, setActionsUsed] = useState(false);
+
+  // Only parse + render action buttons for the latest assistant message,
+  // when not actively streaming, and not yet used.
+  const { cleanContent, actions } = useMemo(
+    () => (isUser ? { cleanContent: message.content, actions: [] } : parseActions(message.content)),
+    [message.content, isUser],
+  );
+  const showActions = !isUser && isLast === true && !streaming && actions.length > 0 && !actionsUsed;
 
   const hasToolCalls = (message.toolCalls?.length ?? 0) > 0;
   const hasToolResults = (message.toolResults?.length ?? 0) > 0;
@@ -56,9 +71,9 @@ export const Message: React.FC<MessageProps> = ({ message, streaming }) => {
       >
         {isUser ? (
           <div className="whitespace-pre-wrap">{message.content}</div>
-        ) : message.content ? (
+        ) : cleanContent ? (
           <div className="max-w-none text-sm leading-relaxed atlas-chat-content [&_p]:my-1 [&_ul]:list-disc [&_ul]:pl-4 [&_ul]:space-y-0.5 [&_ol]:list-decimal [&_ol]:pl-4 [&_ol]:space-y-0.5 [&_pre]:bg-card [&_pre]:text-foreground [&_pre]:rounded [&_pre]:p-2 [&_pre]:border [&_pre]:border-border [&_code]:font-mono [&_code]:text-xs [&_h1]:font-bold [&_h1]:text-base [&_h2]:font-semibold [&_h2]:text-sm [&_h2]:mt-3 [&_h2]:mb-1 [&_h3]:font-medium [&_h3]:text-sm [&_h3]:mt-2 [&_a]:text-primary [&_a]:underline [&_blockquote]:border-l-2 [&_blockquote]:border-border [&_blockquote]:pl-3 [&_blockquote]:text-muted-foreground [&_blockquote]:italic [&_table]:text-xs [&_table]:border-collapse [&_th]:border [&_th]:border-border [&_th]:px-2 [&_th]:py-1 [&_th]:bg-muted [&_td]:border [&_td]:border-border [&_td]:px-2 [&_td]:py-1 [&_hr]:border-border [&_strong]:font-semibold">
-            <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>{message.content}</ReactMarkdown>
+            <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>{cleanContent}</ReactMarkdown>
             {streaming && <span className="animate-pulse">▍</span>}
           </div>
         ) : streaming ? (
@@ -69,6 +84,24 @@ export const Message: React.FC<MessageProps> = ({ message, streaming }) => {
           <div className="text-muted-foreground italic">(vazio)</div>
         ) : null}
       </div>
+
+      {/* Quick action buttons (force user interaction instead of typing yes/no) */}
+      {showActions && (
+        <div className="w-full max-w-[90%] flex flex-wrap gap-1.5 mt-1">
+          {actions.map((label, idx) => (
+            <button
+              key={`${label}-${idx}`}
+              onClick={() => {
+                setActionsUsed(true);
+                void send(label);
+              }}
+              className="px-3 py-1 rounded-md border border-border bg-card text-foreground text-xs hover:bg-primary hover:text-primary-foreground hover:border-primary transition-colors"
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 };

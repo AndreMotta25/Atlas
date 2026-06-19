@@ -113,9 +113,7 @@
 }
 
 body {
-  font-family:
-    -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial,
-    sans-serif;
+  font-family: var(--app-font-family, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif);
   margin: 0;
   padding: 0;
 }
@@ -132,8 +130,17 @@ body {
 }
 
 .cm-editor .cm-scroller {
-  font-family: inherit;
+  font-family: var(--app-font-family, inherit);
   padding: 1rem 2rem;
+}
+
+/* Ensure the editor content inherits the app font. CodeMirror's default theme
+   can set font-family on .cm-content; override with the app variable so the
+   font selector visibly affects the editor. */
+.cm-editor,
+.cm-editor .cm-content,
+.cm-editor .cm-line {
+  font-family: var(--app-font-family, inherit);
 }
 
 .cm-editor.cm-focused {

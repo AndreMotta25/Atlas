@@ -379,7 +379,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
           pagePath: null,
           title: 'Conversa compactada',
         });
-        const summaryContent = `📋 **Conversa compactada**\n\n${result.summary}\n\n---\n*Esta é uma versão resumida da conversa anterior. Você pode continuar fazendo perguntas.*`;
+        const summaryContent = `*Conversa compactada — versão resumida do histórico anterior. Continue normalmente.*\n\n${result.summary}`;
         const summaryMsg: ChatMessage = {
           id: newId(),
           role: 'assistant',

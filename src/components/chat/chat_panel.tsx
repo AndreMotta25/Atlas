@@ -336,8 +336,13 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                 Converse com o Atlas. Configure sua API key da DeepSeek nas configurações ⚙
               </p>
             )}
-            {messages.map((m) => (
-              <Message key={m.id} message={m} streaming={streaming && m.id === activeRequestId} />
+            {messages.map((m, idx) => (
+              <Message
+                key={m.id}
+                message={m}
+                streaming={streaming && m.id === activeRequestId}
+                isLast={idx === messages.length - 1}
+              />
             ))}
             {error && (
               <div className="text-xs bg-destructive/10 border border-destructive/30 text-destructive rounded px-2 py-1">

@@ -25,13 +25,21 @@ export function formatMarkdown(text: string): string {
 
     // Track fenced code blocks — preserve content untouched
     if (/^(```|~~~)/.test(line)) {
+      const wasInFence = inFence;
       inFence = !inFence;
       // Ensure blank line before opening fence (if not at start)
       if (inFence && !prevBlank && result.length > 0) {
         result.push('');
       }
       result.push(line);
-      prevBlank = false;
+      // Ensure blank line after closing fence (handled by pushing '' so the
+      // next non-blank line is separated; collapse logic skips duplicates).
+      if (!inFence && wasInFence) {
+        result.push('');
+        prevBlank = true;
+      } else {
+        prevBlank = false;
+      }
       continue;
     }
 
@@ -68,9 +76,15 @@ export function formatMarkdown(text: string): string {
       continue;
     }
 
-    // Ensure blank line before headings and horizontal rules
-    if ((isHeading || isHr) && !prevBlank && result.length > 0) {
-      result.push('');
+    // Ensure blank line before headings, horizontal rules and lists
+    if ((isHeading || isHr || isList) && !prevBlank && result.length > 0) {
+      const last = result[result.length - 1];
+      // Don't insert a blank between two adjacent list items of the same kind
+      // (keeps tight lists tight) — only separate list from non-list content.
+      const lastIsList = /^\s*([-*+]\s|\d+\.\s)/.test(last);
+      if (!(isList && lastIsList)) {
+        result.push('');
+      }
     }
 
     result.push(line);

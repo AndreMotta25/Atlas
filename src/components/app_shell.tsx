@@ -6,6 +6,7 @@ import { SettingsModal } from './settings/settings_modal';
 import { useVaultStore } from '../stores/vault_store';
 import { useChatStore } from '../stores/chat_store';
 import { useTheme } from '../hooks/use_theme';
+import { useFont } from '../hooks/use_font';
 import { api } from '../lib/api';
 import type { ChatSearchResult } from '../types';
 import {
@@ -62,6 +63,7 @@ export const AppShell: React.FC = () => {
   const searchInputRef = useRef<HTMLInputElement | null>(null);
 
   useTheme();
+  useFont();
 
   useEffect(() => {
     void loadTree();

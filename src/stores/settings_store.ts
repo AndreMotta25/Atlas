@@ -7,6 +7,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   activeProvider: 'deepseek',
   defaultModel: 'deepseek-chat',
   themeMode: 'system',
+  fontFamily: null,
 };
 
 interface SettingsState {

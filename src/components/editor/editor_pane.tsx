@@ -27,6 +27,7 @@ import { linter } from '@codemirror/lint';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useVaultStore } from '../../stores/vault_store';
 import { useChatStore } from '../../stores/chat_store';
+import { useSettingsStore } from '../../stores/settings_store';
 import { livePreview, livePreviewModeField, setLivePreviewMode, type LivePreviewMode } from './live_preview';
 import { formatMarkdown } from './format_markdown';
 import { atlasCompletionSources } from './autocomplete_source';
@@ -80,6 +81,9 @@ export const EditorPane: React.FC<EditorPaneProps> = ({ onCommentsChange, onComm
   const saveCurrent = useVaultStore((s) => s.saveCurrent);
   const setDirty = useVaultStore((s) => s.setDirty);
   const dirty = useVaultStore((s) => s.dirty);
+
+  const fontFamily = useSettingsStore((s) => s.settings.fontFamily);
+  const updateSettings = useSettingsStore((s) => s.update);
 
   const [menuPos, setMenuPos] = useState<{ x: number; y: number } | null>(null);
 
@@ -547,6 +551,26 @@ export const EditorPane: React.FC<EditorPaneProps> = ({ onCommentsChange, onComm
           >
             <FormatIcon className="w-3.5 h-3.5" />
           </button>
+          <select
+            value={fontFamily ?? ''}
+            onChange={(e) => void updateSettings({ fontFamily: e.target.value || null })}
+            title="Fonte do editor"
+            className="text-xs px-1 py-0.5 border border-input bg-card text-foreground rounded focus:outline-none focus:border-primary max-w-[120px] cursor-pointer"
+          >
+            <option value="">Fonte do sistema</option>
+            <option value="Inter">Inter</option>
+            <option value="Roboto">Roboto</option>
+            <option value="Lora">Lora</option>
+            <option value="Merriweather">Merriweather</option>
+            <option value="Source Serif 4">Source Serif 4</option>
+            <option value="IBM Plex Sans">IBM Plex Sans</option>
+            <option value="IBM Plex Serif">IBM Plex Serif</option>
+            <option value="Noto Sans">Noto Sans</option>
+            <option value="Noto Serif">Noto Serif</option>
+            <option value="JetBrains Mono">JetBrains Mono</option>
+            <option value="Fira Code">Fira Code</option>
+            <option value="Space Grotesk">Space Grotesk</option>
+          </select>
           <span className="flex items-center gap-1.5 text-xs tabular-nums">
             {dirty ? (
               <>

@@ -191,6 +191,8 @@ export interface AppSettings {
   themeMode: ThemeMode;
   /** Custom system prompt. Falls back to the built-in default when empty or undefined. */
   systemPrompt?: string;
+  /** Google Font family name applied to the editor + chat. null = system default. */
+  fontFamily: string | null;
 }
 
 // ─── Search / Index Types ───────────────────────────────────────

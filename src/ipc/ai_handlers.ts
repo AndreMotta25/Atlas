@@ -232,28 +232,64 @@ export const registerAIHandlers = (): void => {
       const chat = createDeepSeek(apiKey);
       const model = chat(settings.defaultModel);
 
-      // Format conversation as text for the summary prompt
+      // Render each message INCLUDING tool calls and tool results — these carry
+      // the most valuable context (paths read, edits applied, errors). Dropping
+      // them (as the previous version did) produced summaries that forgot every
+      // page the conversation touched.
       const conversationText = messages
         .filter((m) => m.role !== 'system')
-        .map((m) => `**${m.role === 'user' ? 'Usuário' : 'Atlas'}**:\n${m.content}`)
+        .map((m) => {
+          const speaker = m.role === 'user' ? 'Usuário' : 'Atlas';
+          const parts: string[] = [`**${speaker}**:`];
+          if (m.content.trim()) parts.push(m.content.trim());
+          m.toolCalls?.forEach((tc) => {
+            const arg = tc.args && typeof tc.args === 'object'
+              ? Object.entries(tc.args as Record<string, unknown>)
+                  .map(([k, v]) => `${k}=${JSON.stringify(v)}`)
+                  .join(', ')
+              : '';
+            parts.push(`  [tool-call ${tc.toolName}(${arg})]`);
+          });
+          m.toolResults?.forEach((tr) => {
+            const bits: string[] = [];
+            if (tr.path) bits.push(`path=${tr.path}`);
+            if (typeof tr.count === 'number') bits.push(`count=${tr.count}`);
+            if (tr.success === false) bits.push('FALHOU');
+            if (tr.error) bits.push(`erro=${tr.error}`);
+            parts.push(`  [tool-result ${tr.toolName}${bits.length ? `: ${bits.join(', ')}` : ''}]`);
+          });
+          return parts.join('\n');
+        })
         .join('\n\n---\n\n');
 
       try {
         const result = await generateText({
           model,
-          system: `Você é um assistente que resume conversas de forma concisa mas completa.
-Você receberá uma conversa entre um Usuário e o Atlas (um assistente de vault de notas).
+          system: `Você compacta conversas do Atlas (assistente de vault de notas Markdown).
+Recebe o histórico entre Usuário e Atlas, incluindo chamadas de ferramenta ([tool-call ...]) e seus resultados ([tool-result ...]).
 
-Instruções:
-- Resuma a conversa preservando: arquivos mencionados, decisões tomadas, alterações feitas, e contexto importante.
-- Use português claro e direto.
-- Mantenha o tom profissional.
-- Se houver ações pendentes, mencione-as.
-- Limite o resumo a no máximo 3 parágrafos.`,
+Devolva UM resumo estruturado em Markdown — SEM intro, SEM floreio — usando exatamente estas seções:
+
+## Contexto
+O que foi discutido, em 1-3 frases.
+
+## Páginas mencionadas
+Lista em bullets dos paths citados/lidos/criados/editados (use \`código\` para paths). Inclua só paths que apareceram na conversa — não invente.
+
+## Decisões e alterações
+Bullets com o que foi decidido ou alterado no vault (edições aplicadas, páginas criadas). Se nada foi alterado, escreva \`(nenhuma)\`.
+
+## Ações pendentes
+Bullets com próximos passos explícitos ou implícitos. Se não houver, escreva \`(nenhuma)\`.
+
+Regras:
+- Português, direto, sem emojis.
+- Não invente paths nem conteúdos que não estejam na conversa.
+- Marque incerteza com "(?)".`,
           messages: [
             {
               role: 'user',
-              content: `Aqui está a conversa para resumir:\n\n${conversationText}`,
+              content: `Conversa para compactar:\n\n${conversationText}`,
             },
           ],
         });

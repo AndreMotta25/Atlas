@@ -8,6 +8,7 @@ const DEFAULTS: AppSettings = {
   activeProvider: 'deepseek',
   defaultModel: 'deepseek-chat',
   themeMode: 'system',
+  fontFamily: null,
 };
 
 const FILENAME = 'config.json';
