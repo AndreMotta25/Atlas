@@ -1,8 +1,15 @@
 import { create } from 'zustand';
 import { api } from '../lib/api';
-import type { ChatMessage, ChatStreamChunk } from '../types';
+import type {
+  ChatMessage,
+  ChatStreamChunk,
+  PendingToolCall,
+  ToolResultPayload,
+} from '../types';
 
 const newId = () => Math.random().toString(36).slice(2, 10);
+
+const WRITE_TOOLS = new Set(['create_page', 'edit_page']);
 
 interface ChatState {
   messages: ChatMessage[];
@@ -15,6 +22,11 @@ interface ChatState {
   send: (text: string) => Promise<void>;
   cancel: () => Promise<void>;
   reset: () => void;
+
+  // Tool confirmation flow
+  confirmToolCall: (toolCallId: string) => Promise<void>;
+  rejectToolCall: (toolCallId: string) => Promise<void>;
+  undoLast: () => Promise<void>;
 }
 
 export const useChatStore = create<ChatState>((set, get) => ({
@@ -25,7 +37,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   unsubscribe: null,
 
   init: () => {
-    const off = api.ai.onToken((chunk: ChatStreamChunk) => {
+    const offToken = api.ai.onToken((chunk: ChatStreamChunk) => {
       const state = get();
       if (chunk.requestId !== state.activeRequestId) return;
 
@@ -46,8 +58,57 @@ export const useChatStore = create<ChatState>((set, get) => ({
         set({ streaming: false, activeRequestId: null });
       }
     });
-    set({ unsubscribe: off });
-    return off;
+
+    const offPending = api.ai.onToolPending((pending: PendingToolCall) => {
+      const state = get();
+      if (pending.requestId !== state.activeRequestId) return;
+      set({
+        messages: state.messages.map((m) =>
+          m.id === state.activeRequestId
+            ? { ...m, toolCalls: [...(m.toolCalls ?? []), pending] }
+            : m,
+        ),
+      });
+    });
+
+    const offResult = api.ai.onToolResult((result: ToolResultPayload) => {
+      set((s) => ({
+        messages: s.messages.map((m) => {
+          if (!m.toolCalls?.some((tc) => tc.toolCallId === result.toolCallId)) {
+            // Result for a tool call not in this message? Could be a read tool —
+            // attach to the active assistant message as a toolResult entry.
+            if (m.id === s.activeRequestId && !WRITE_TOOLS.has(result.toolName)) {
+              return {
+                ...m,
+                toolResults: [...(m.toolResults ?? []), result],
+              };
+            }
+            return m;
+          }
+          // Update the toolCall status based on result.
+          const nextStatus: PendingToolCall['status'] = result.undone
+            ? 'undone'
+            : result.error
+              ? 'rejected'
+              : 'applied';
+          return {
+            ...m,
+            toolCalls: m.toolCalls.map((tc) =>
+              tc.toolCallId === result.toolCallId ? { ...tc, status: nextStatus } : tc,
+            ),
+            toolResults: [...(m.toolResults ?? []), result],
+          };
+        }),
+      }));
+    });
+
+    const unsubscribe = () => {
+      offToken();
+      offPending();
+      offResult();
+    };
+    set({ unsubscribe });
+    return unsubscribe;
   },
 
   send: async (text) => {
@@ -65,15 +126,16 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
     const history = get().messages
       .filter((m) => m.id !== assistantId)
-      .map((m) => ({ id: m.id, role: m.role, content: m.content }));
+      .map((m) => ({
+        id: m.id,
+        role: m.role,
+        content: m.content,
+        toolCalls: m.toolCalls,
+        toolResults: m.toolResults,
+      }));
 
     try {
       const { requestId } = await api.ai.chat({ messages: history });
-      // Map requestId returned by main to the active assistant message id so
-      // incoming token chunks (which reference requestId) update the right msg.
-      // We use activeRequestId as the assistantId; main uses its own uuid.
-      // To keep matching, we override our activeRequestId to main's requestId
-      // AND migrate the in-progress assistant message id to match.
       set((s) => ({
         messages: s.messages.map((m) =>
           m.id === assistantId ? { ...m, id: requestId } : m,
@@ -100,5 +162,48 @@ export const useChatStore = create<ChatState>((set, get) => ({
     const { unsubscribe } = get();
     if (unsubscribe) unsubscribe();
     set({ messages: [], streaming: false, activeRequestId: null, error: null, unsubscribe: null });
+  },
+
+  confirmToolCall: async (toolCallId) => {
+    const state = get();
+    if (!state.activeRequestId) return;
+    // Find the pending call to recover toolName + args.
+    let pending: PendingToolCall | undefined;
+    for (const m of state.messages) {
+      pending = m.toolCalls?.find((tc) => tc.toolCallId === toolCallId);
+      if (pending) break;
+    }
+    if (!pending) return;
+    try {
+      await api.tool.confirm({
+        toolCallId: pending.toolCallId,
+        toolName: pending.toolName,
+        args: pending.args,
+        requestId: state.activeRequestId,
+      });
+    } catch (err) {
+      set({ error: err instanceof Error ? err.message : String(err) });
+    }
+  },
+
+  rejectToolCall: async (toolCallId) => {
+    const state = get();
+    if (!state.activeRequestId) return;
+    try {
+      await api.tool.reject({
+        toolCallId,
+        requestId: state.activeRequestId,
+      });
+    } catch (err) {
+      set({ error: err instanceof Error ? err.message : String(err) });
+    }
+  },
+
+  undoLast: async () => {
+    try {
+      await api.undo.last();
+    } catch (err) {
+      set({ error: err instanceof Error ? err.message : String(err) });
+    }
   },
 }));

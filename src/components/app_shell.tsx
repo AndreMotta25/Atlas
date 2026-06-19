@@ -8,6 +8,12 @@ import { useChatStore } from '../stores/chat_store';
 import { useTheme } from '../hooks/use_theme';
 import { api } from '../lib/api';
 
+export interface CommentEntry {
+  pos: number;
+  text: string;
+  comment: string;
+}
+
 const MIN_SIDEBAR = 180;
 const MIN_CHAT = 260;
 
@@ -34,6 +40,13 @@ export const AppShell: React.FC = () => {
 
   const resizeRef = useRef<'sidebar' | 'chat' | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
+  const deleteCommentRef = useRef<((index: number) => void) | null>(null);
+  const updateCommentRef = useRef<((index: number, newComment: string) => void) | null>(null);
+
+  // Comment coordination
+  const [comments, setComments] = useState<CommentEntry[]>([]);
+  const [commentIndex, setCommentIndex] = useState(0);
+  const [chatTab, setChatTab] = useState<'chat' | 'comments'>('chat');
 
   useTheme();
 
@@ -118,6 +131,19 @@ export const AppShell: React.FC = () => {
     await loadTree();
   };
 
+  const handleCommentSelect = (index: number) => {
+    setCommentIndex(index);
+    setChatTab('comments');
+  };
+
+  const handleDeleteComment = (index: number) => {
+    deleteCommentRef.current?.(index);
+  };
+
+  const handleUpdateComment = (index: number, newComment: string) => {
+    updateCommentRef.current?.(index, newComment);
+  };
+
   return (
     <div className="flex h-screen bg-background text-foreground overflow-hidden">
       <aside className="border-r border-border flex flex-col overflow-hidden" style={{ width: sidebarWidth, minWidth: MIN_SIDEBAR }}>
@@ -183,13 +209,26 @@ export const AppShell: React.FC = () => {
       <ResizeHandle onStart={() => { resizeRef.current = 'sidebar'; }} />
 
       <main className="overflow-hidden flex flex-col flex-1">
-        <EditorPane />
+        <EditorPane
+          onCommentsChange={setComments}
+          onCommentSelect={handleCommentSelect}
+          deleteCommentRef={deleteCommentRef}
+          updateCommentRef={updateCommentRef}
+        />
       </main>
 
       <ResizeHandle onStart={() => { resizeRef.current = 'chat'; }} />
 
       <aside className="border-l border-border overflow-hidden" style={{ width: chatWidth, minWidth: MIN_CHAT }}>
-        <ChatPanel />
+        <ChatPanel
+          chatTab={chatTab}
+          onSetTab={setChatTab}
+          comments={comments}
+          commentIndex={commentIndex}
+          onCommentIndexChange={setCommentIndex}
+          onDeleteComment={handleDeleteComment}
+          onUpdateComment={handleUpdateComment}
+        />
       </aside>
 
       {settingsOpen && <SettingsModal onClose={() => setSettingsOpen(false)} />}

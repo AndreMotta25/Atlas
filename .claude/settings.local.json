@@ -4,7 +4,9 @@
       "Bash(taskkill /F /IM Atlas.exe)",
       "Bash(taskkill /F /IM electron.exe)",
       "Bash(rm -rf .webpack)",
-      "Bash(npm start:*)"
+      "Bash(npm start:*)",
+      "Bash(python3:*)",
+      "Bash(npx tsc:*)"
     ]
   }
 }

@@ -6,6 +6,11 @@ import type {
   ChatRequestOptions,
   ChatStreamChunk,
   PageContent,
+  PendingToolCall,
+  ToolConfirmRequest,
+  ToolRejectRequest,
+  ToolResultPayload,
+  UndoResult,
   VaultChangeEvent,
   VaultStatus,
   VaultTree,
@@ -99,6 +104,31 @@ const electronAPI = {
       ipcRenderer.on(channel, wrapped);
       return () => ipcRenderer.removeListener(channel, wrapped);
     },
+    onToolPending: (listener: Listener<PendingToolCall>): Unsubscribe => {
+      const channel = createChannel('ai', 'tool-pending');
+      const wrapped = (_e: unknown, payload: PendingToolCall) => listener(payload);
+      ipcRenderer.on(channel, wrapped);
+      return () => ipcRenderer.removeListener(channel, wrapped);
+    },
+    onToolResult: (listener: Listener<ToolResultPayload>): Unsubscribe => {
+      const channel = createChannel('ai', 'tool-result');
+      const wrapped = (_e: unknown, payload: ToolResultPayload) => listener(payload);
+      ipcRenderer.on(channel, wrapped);
+      return () => ipcRenderer.removeListener(channel, wrapped);
+    },
+  },
+
+  // ── Tools (write confirmation flow) ──
+  tool: {
+    confirm: (req: ToolConfirmRequest): Promise<ToolResultPayload> =>
+      ipcRenderer.invoke(createChannel('tool', 'confirm'), req),
+    reject: (req: ToolRejectRequest): Promise<{ success: boolean }> =>
+      ipcRenderer.invoke(createChannel('tool', 'reject'), req),
+  },
+
+  // ── Undo ──
+  undo: {
+    last: (): Promise<UndoResult> => ipcRenderer.invoke(createChannel('undo', 'last')),
   },
 };
 

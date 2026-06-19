@@ -8,11 +8,11 @@
 
 ## Etapa atual
 
-**Fase 1 (MVP) — ✅ Concluída** (escopo mínimo viável, sem SQLite).
+**Fase 2 — IA com Tools (sem SQLite) — ✅ Concluída**
 
-App usável de ponta a ponta: escolher vault, navegar, editar Markdown com Live Preview, conversar com DeepSeek. Persistência de settings/keys em `userData`.
+A IA agora lê e propõe escritas no vault via tools (`read_page`, `list_pages`, `create_page`, `edit_page` em 3 modos). Cada escrita vira um card de confirmação no chat com preview, Aceitar/Rejeitar, e Desfazer pós-apply. Decisões travadas: **sem SQLite** (escritas direto no disco via `VaultManager`), **edit híbrido** (`replace`/`append`/`replace_section`), **sem grafo**.
 
-Próxima etapa prevista: **Fase 2 — IA com tools + SQLite** (ver "O que falta" abaixo).
+Próxima etapa prevista: **Fase 2.5 — SQLite + Indexer** (destrava backlinks, search FTS5). Ver "O que falta" abaixo.
 
 ---
 
@@ -44,25 +44,40 @@ Próxima etapa prevista: **Fase 2 — IA com tools + SQLite** (ver "O que falta"
 | **Menu de contexto (botão direito)** | ✅ | `src/components/editor/context_menu.tsx`, `markdown_actions.ts` |
 | Ações: Títulos 1–3, Negrito, Itálico, Riscado, Código, Link, Citação, Lista, Régua, Recuo | ✅ | `markdown_actions.ts` |
 | **Sem numeração de linhas** | ✅ | `editor_pane.tsx` |
+| **Sistema de comentários** com highlights `==texto==<!--c:comentário-->` | ✅ | `editor_pane.tsx`, `comment_popup.tsx`, `chat_panel.tsx` |
+| **Temas claro/escuro/sistema** (`nativeTheme` ↔ `.dark`) | ✅ | `theme_handlers.ts`, `use_theme.ts`, `index.css` |
+| Renomear páginas/pastas no vault | ✅ | `file_tree.tsx` |
+
+### Fase 2 — IA com Tools (sem SQLite) — ✅ Concluída
+
+| Área | Implementado | Arquivos |
+|---|---|---|
+| **Tools de leitura** (`read_page`, `list_pages`) com auto-exec no stream | ✅ | `src/ai/tools.ts`, `orchestrator.ts` |
+| **Tools de escrita** (`create_page`, `edit_page`) com intercepção | ✅ | `tools.ts`, `orchestrator.ts` |
+| `edit_page` híbrido — `replace` / `append` / `replace_section` | ✅ | `src/ai/tool_executor.ts` |
+| Detecção de heading para `replace_section` (preserva nível) | ✅ | `tool_executor.ts` |
+| **Cards de confirmação** no chat (Aceitar/Rejeitar/Desfazer) | ✅ | `src/components/chat/confirm_card.tsx`, `message.tsx` |
+| **Cards de resultado** para tools de leitura (preview do conteúdo) | ✅ | `src/components/chat/tool_result_card.tsx` |
+| **DiffView** (LCS clássico, sem dep externa) — disponível p/ uso futuro | ✅ | `src/components/chat/diff_view.tsx` |
+| **Undo ring buffer** (N=10, restore ou delete) | ✅ | `tool_executor.ts`, `undo:last` IPC |
+| **Resume da conversa** após confirmação (two-call pattern AI SDK v6) | ✅ | `orchestrator.ts` (`runTurn`), `ai_handlers.ts` (`resumeConversation`) |
+| `ConversationContext` mantido no main por `requestId` | ✅ | `ai_handlers.ts` |
+| System prompt atualizado com regras das tools | ✅ | `orchestrator.ts` |
+| IPC type-safe: `tool:confirm`, `tool:reject`, `undo:last`, `ai:tool-pending`, `ai:tool-result` | ✅ | `tool_handlers.ts`, `preload.ts` |
 
 ---
 
 ## O que falta
 
-### Fase 2 — IA com tools + SQLite (próxima)
+### Fase 2.5 — SQLite + Indexer (próxima)
 
 - [ ] **SQLite** (`better-sqlite3`) — estava no escopo original da Fase 1, foi deferido.
   - Tabelas: `pages`, `links`, `tags`, `pages_fts` (FTS5).
   - Migration inicial + índices.
   - Ver `.claude/rules/SQLite.md` para padrões.
 - [ ] **Indexer** — parse de `[[wiki-links]]` e `#tags` ao salvar; popular tabelas `links`/`tags`.
-- [ ] **Tools da IA** (function calling via Vercel AI SDK):
-  - `read_page`, `create_page`, `edit_page`, `list_pages`, `search`, `get_backlinks`.
-- [ ] **Cards de confirmação no chat** — cada tool call vira um card `[Aceitar] [Rejeitar] [Editar]`.
-  - `src/components/chat/confirm_card.tsx` (novo).
-  - `ToolExecutor` no main que aplica mudanças só após aceitação.
-- [ ] **Undo** de operações via snapshot do estado anterior.
-- [ ] Política de **diff** (decidir entre substituição total vs patch — arquitetura sugere substituição total no MVP).
+- [ ] **Tools `search` e `get_backlinks`** para a IA (dependem do SQLite).
+- [ ] Política de **diff** — atualmente `replace` total; avaliar patch semântico no futuro.
 
 ### Fase 3 — Rico
 

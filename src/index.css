@@ -157,8 +157,22 @@ body {
   background: color-mix(in srgb, var(--color-input) 50%, transparent) !important;
 }
 
-.cm-editor .cm-cursor {
-  border-left-color: var(--color-muted-foreground);
+.cm-editor .cm-cursor,
+.cm-editor.cm-focused .cm-cursor,
+.cm-editor .cm-dropCursor {
+  border-left: 1.2px solid #ffffff !important;
+  border-left-color: #ffffff !important;
+  caret-color: #ffffff !important;
+}
+
+.cm-editor .cm-content {
+  caret-color: #ffffff !important;
+}
+
+/* Caret branco em todos os campos de texto (chat, comentários, inputs) */
+textarea,
+input {
+  caret-color: #ffffff;
 }
 
 .cm-editor .cm-activeLineGutter {
@@ -246,3 +260,19 @@ body {
   border-top: 2px solid var(--color-border);
   margin: 1em 0;
 }
+
+/* ─── Highlights & Comments ─────────────────────────────────────── */
+
+.atlas-highlight {
+  background-color: #fef08a;
+  border-bottom: 2px solid #eab308;
+  border-radius: 2px;
+  cursor: help;
+  padding: 0.05em 0;
+}
+
+.dark .atlas-highlight {
+  background-color: #3b3000;
+  border-bottom-color: #ca8a04;
+}
+

@@ -1,10 +1,191 @@
-import { ipcMain, BrowserWindow } from 'electron';
+import { ipcMain, BrowserWindow, type IpcMainInvokeEvent } from 'electron';
 import { randomUUID } from 'crypto';
 import { createChannel } from '../types';
-import { AIOrchestrator } from '../ai/orchestrator';
-import type { ChatRequestOptions, ChatStreamChunk } from '../types';
+import { AIOrchestrator, type OrchestratorSinks } from '../ai/orchestrator';
+import type {
+  ChatMessage,
+  ChatRequestOptions,
+  ChatStreamChunk,
+  ConversationContext,
+  PendingToolCall,
+  ToolResultPayload,
+} from '../types';
 
 const activeControllers = new Map<string, AbortController>();
+
+/**
+ * In-main conversation state per active AI request. Used to resume the stream
+ * after the user confirms or rejects a pending write tool call.
+ */
+const conversationContexts = new Map<string, ConversationContext>();
+
+export const getConversationContext = (requestId: string): ConversationContext | undefined =>
+  conversationContexts.get(requestId);
+
+const sendToSender = (sender: IpcMainInvokeEvent['sender'], channel: string, payload: unknown) => {
+  if (!sender.isDestroyed()) sender.send(channel, payload);
+};
+
+const broadcastToWindows = (channel: string, payload: unknown) => {
+  for (const win of BrowserWindow.getAllWindows()) {
+    win.webContents.send(channel, payload);
+  }
+};
+
+const buildSinks = (sender: IpcMainInvokeEvent['sender']): OrchestratorSinks => ({
+  chunk: (chunk) => sendToSender(sender, createChannel('ai', 'token'), chunk),
+  toolPending: (pending) =>
+    sendToSender(sender, createChannel('ai', 'tool-pending'), pending),
+  toolResult: (result) =>
+    sendToSender(sender, createChannel('ai', 'tool-result'), result),
+});
+
+const runTurnAndStore = async (
+  sender: IpcMainInvokeEvent['sender'],
+  opts: ChatRequestOptions,
+  requestId: string,
+): Promise<void> => {
+  const controller = new AbortController();
+  activeControllers.set(requestId, controller);
+
+  const context: ConversationContext = {
+    requestId,
+    messages: opts.messages,
+    model: opts.model,
+    pending: new Map(),
+  };
+  conversationContexts.set(requestId, context);
+
+  try {
+    const result = await AIOrchestrator.runTurn(
+      { messages: opts.messages, model: opts.model },
+      requestId,
+      buildSinks(sender),
+      controller.signal,
+    );
+
+    // If we captured pending write tool calls, register them so tool:confirm /
+    // tool:reject can find them later. We also stash the assistant text so the
+    // next resume includes it as part of the assistant turn.
+    if (result.pendingToolCalls.length > 0) {
+      for (const pending of result.pendingToolCalls) {
+        context.pending.set(pending.toolCallId, pending);
+      }
+      // Replace the last message (placeholder assistant) with the captured one.
+      // The renderer already has the streaming text; we just need the structure.
+      context.messages = [
+        ...opts.messages,
+        {
+          id: requestId,
+          role: 'assistant',
+          content: result.assistantText,
+          toolCalls: result.pendingToolCalls,
+        },
+      ];
+    } else {
+      // Normal turn complete — context is no longer needed.
+      conversationContexts.delete(requestId);
+    }
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    sendToSender(sender, createChannel('ai', 'token'), {
+      requestId,
+      delta: '',
+      done: false,
+      error: msg,
+    } satisfies ChatStreamChunk);
+    sendToSender(sender, createChannel('ai', 'token'), {
+      requestId,
+      delta: '',
+      done: true,
+    } satisfies ChatStreamChunk);
+    conversationContexts.delete(requestId);
+  } finally {
+    activeControllers.delete(requestId);
+  }
+};
+
+/**
+ * Continue the conversation after the user confirmed or rejected a pending
+ * write tool call. The tool result is appended to the message history and the
+ * model is invoked again.
+ */
+export const resumeConversation = async (
+  sender: IpcMainInvokeEvent['sender'],
+  requestId: string,
+  toolResult: ToolResultPayload,
+  pending: PendingToolCall,
+): Promise<void> => {
+  const context = conversationContexts.get(requestId);
+  if (!context) {
+    sendToSender(sender, createChannel('ai', 'token'), {
+      requestId,
+      delta: '',
+      done: true,
+    } satisfies ChatStreamChunk);
+    return;
+  }
+
+  // Attach the tool result to the assistant message we captured earlier.
+  const updatedMessages: ChatMessage[] = context.messages.map((m) =>
+    m.id === requestId
+      ? { ...m, toolResults: [...(m.toolResults ?? []), toolResult] }
+      : m,
+  );
+  context.messages = updatedMessages;
+  context.pending.delete(pending.toolCallId);
+
+  // Surface the result to the renderer (updates card state).
+  broadcastToWindows(createChannel('ai', 'tool-result'), toolResult);
+
+  const controller = new AbortController();
+  activeControllers.set(requestId, controller);
+
+  try {
+    const result = await AIOrchestrator.runTurn(
+      { messages: updatedMessages, model: context.model },
+      requestId,
+      buildSinks(sender),
+      controller.signal,
+    );
+
+    if (result.pendingToolCalls.length > 0) {
+      // Model proposed another write tool — keep waiting for confirmation.
+      for (const next of result.pendingToolCalls) {
+        context.pending.set(next.toolCallId, next);
+      }
+      // Append the new assistant text/tool calls as a fresh message
+      // (the previous assistant turn is now "closed" with its tool result).
+      context.messages = [
+        ...updatedMessages,
+        {
+          id: randomUUID(),
+          role: 'assistant',
+          content: result.assistantText,
+          toolCalls: result.pendingToolCalls,
+        },
+      ];
+    } else {
+      conversationContexts.delete(requestId);
+    }
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    sendToSender(sender, createChannel('ai', 'token'), {
+      requestId,
+      delta: '',
+      done: false,
+      error: msg,
+    } satisfies ChatStreamChunk);
+    sendToSender(sender, createChannel('ai', 'token'), {
+      requestId,
+      delta: '',
+      done: true,
+    } satisfies ChatStreamChunk);
+    conversationContexts.delete(requestId);
+  } finally {
+    activeControllers.delete(requestId);
+  }
+};
 
 export const registerAIHandlers = (): void => {
   ipcMain.handle(
@@ -13,19 +194,8 @@ export const registerAIHandlers = (): void => {
       const requestId = randomUUID();
       const sender = event.sender;
 
-      const sink = (chunk: ChatStreamChunk) => {
-        if (!sender.isDestroyed()) {
-          sender.send(createChannel('ai', 'token'), chunk);
-        }
-      };
-
-      const controller = new AbortController();
-      activeControllers.set(requestId, controller);
-
-      // Fire and forget — streaming happens via sink.
-      void AIOrchestrator.streamChat(opts, requestId, sink).finally(() => {
-        activeControllers.delete(requestId);
-      });
+      // Fire and forget — streaming happens via sinks.
+      void runTurnAndStore(sender, opts, requestId);
 
       return { requestId };
     },
@@ -37,14 +207,12 @@ export const registerAIHandlers = (): void => {
       controller.abort();
       activeControllers.delete(requestId);
     }
-    // Notify renderer the stream ended.
-    for (const win of BrowserWindow.getAllWindows()) {
-      win.webContents.send(createChannel('ai', 'token'), {
-        requestId,
-        delta: '',
-        done: true,
-      } satisfies ChatStreamChunk);
-    }
+    conversationContexts.delete(requestId);
+    broadcastToWindows(createChannel('ai', 'token'), {
+      requestId,
+      delta: '',
+      done: true,
+    } satisfies ChatStreamChunk);
     return { success: true };
   });
 };

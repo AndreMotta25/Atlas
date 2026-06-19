@@ -149,6 +149,49 @@ function decorateWikiLinksAndTags(view: EditorView, decos: Range<Decoration>[]) 
   }
 }
 
+// ─── Highlights & comments (regex pass) ──────────────────────────
+
+const HIGHLIGHT_RE = /==([^=]+)==/g;
+const COMMENT_RE = /<!--c:(.+?)-->/g;
+
+function decorateHighlightsAndComments(view: EditorView, decos: Range<Decoration>[]) {
+  const state = view.state;
+
+  for (const { from, to } of view.visibleRanges) {
+    const text = state.doc.sliceString(from, to);
+
+    HIGHLIGHT_RE.lastIndex = 0;
+    let m: RegExpExecArray | null;
+    while ((m = HIGHLIGHT_RE.exec(text))) {
+      const fullStart = from + m.index;
+      const fullEnd = fullStart + m[0].length;
+      const contentStart = fullStart + 2; // after ==
+      const contentEnd = fullEnd - 2;     // before ==
+      // Hide the == marks
+      hideRange(fullStart, contentStart, decos);
+      hideRange(contentEnd, fullEnd, decos);
+      // Highlight the content
+      decos.push(Decoration.mark({ class: 'atlas-highlight' }).range(contentStart, contentEnd));
+    }
+
+    COMMENT_RE.lastIndex = 0;
+    while ((m = COMMENT_RE.exec(text))) {
+      const start = from + m.index;
+      const end = start + m[0].length;
+      // Always hide the entire comment markup — comments only appear in the sidebar
+      hideRange(start, end, decos);
+    }
+  }
+}
+
+/** Find a comment adjacent to a position (looks forward up to 50 chars). */
+export function findCommentAt(state: { doc: { sliceString: (from: number, to: number) => string }; length: number }, pos: number): string | null {
+  const slice = state.doc.sliceString(pos, Math.min(pos + 50, state.length));
+  const m = COMMENT_RE.exec(slice);
+  COMMENT_RE.lastIndex = 0;
+  return m ? m[1].trim() : null;
+}
+
 // ─── Main builder ────────────────────────────────────────────────
 
 function buildDecorations(view: EditorView): DecorationSet {
@@ -183,6 +226,7 @@ function buildDecorations(view: EditorView): DecorationSet {
     });
   }
 
+  decorateHighlightsAndComments(view, decos);
   decorateWikiLinksAndTags(view, decos);
 
   return Decoration.set(decos, true);
