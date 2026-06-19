@@ -120,3 +120,54 @@ export function changeIndent(view: EditorView, delta: 2 | -2): void {
   view.dispatch({ changes });
   view.focus();
 }
+
+/** Insert an image `![alt](url)` at cursor or wrapping the selection. */
+export function insertImage(view: EditorView): void {
+  const sel = view.state.selection.main;
+  const selected = view.state.doc.sliceString(sel.from, sel.to);
+  const alt = selected.length > 0 ? selected : 'descrição';
+  const insert = `![${alt}](url)`;
+  const urlStart = sel.from + 2 + alt.length + 2;
+  view.dispatch({
+    changes: { from: sel.from, to: sel.to, insert },
+    selection: EditorSelection.range(urlStart, urlStart + 3),
+  });
+  view.focus();
+}
+
+/** Insert a GFM table template at cursor. */
+export function insertTable(view: EditorView): void {
+  const sel = view.state.selection.main;
+  const template = `| Coluna 1 | Coluna 2 | Coluna 3 |
+|----------|----------|----------|
+|          |          |          |`;
+  view.dispatch({
+    changes: { from: sel.from, to: sel.to, insert: template },
+  });
+  view.focus();
+}
+
+/** Toggle a GFM task checkbox on the current line. */
+export function insertCheckbox(view: EditorView): void {
+  const sel = view.state.selection.main;
+  const line = view.state.doc.lineAt(sel.from);
+  const body = line.text.replace(/^[-*+]\s+(\[.\]\s*)?/, '');
+  view.dispatch({
+    changes: { from: line.from, to: line.to, insert: `- [ ] ${body}` },
+  });
+  view.focus();
+}
+
+/** Insert a fenced code block at cursor (wraps selection if any). */
+export function insertCodeBlock(view: EditorView): void {
+  const sel = view.state.selection.main;
+  const selected = view.state.doc.sliceString(sel.from, sel.to);
+  const inner = selected.length > 0 ? selected : 'código';
+  const insert = `\`\`\`\n${inner}\n\`\`\``;
+  const cursor = sel.from + 4 + inner.length + 1;
+  view.dispatch({
+    changes: { from: sel.from, to: sel.to, insert },
+    selection: EditorSelection.cursor(cursor),
+  });
+  view.focus();
+}

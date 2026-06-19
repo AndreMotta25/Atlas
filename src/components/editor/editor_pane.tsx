@@ -23,6 +23,10 @@ import {
   setHeading,
   toggleLinePrefix,
   wrapSelection,
+  insertImage,
+  insertTable,
+  insertCheckbox,
+  insertCodeBlock,
 } from './markdown_actions';
 
 const SAVE_DEBOUNCE_MS = 500;
@@ -380,6 +384,10 @@ export const EditorPane: React.FC<EditorPaneProps> = ({ onCommentsChange, onComm
     const INDENT = `<svg viewBox="0 0 16 16" fill="currentColor"><path d="M3 3h10v1H3V3Zm5 4h5v1H8V7Zm0 4h5v1H8v-1ZM3 7l2 2-2 2V7Z"/></svg>`;
     const OUTDENT = `<svg viewBox="0 0 16 16" fill="currentColor"><path d="M3 3h10v1H3V3Zm0 4h5v1H3V7Zm0 4h5v1H3v-1ZM8 7l2 2-2 2V7Z"/></svg>`;
     const COMMENT = `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2H3a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h5l3 3 2-2h0a1 1 0 0 0 1-1V3a1 1 0 0 0-1-1Z"/></svg>`;
+    const IMAGE = `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="14" height="10" rx="2"/><circle cx="5" cy="6.5" r="1.5"/><path d="M1 11l4-4 3 3 2-2 5 5"/></svg>`;
+    const TABLE = `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1" y="1" width="14" height="14" rx="1"/><line x1="1" y1="5" x2="15" y2="5"/><line x1="1" y1="9" x2="15" y2="9"/><line x1="5" y1="1" x2="5" y2="15"/><line x1="10" y1="1" x2="10" y2="15"/></svg>`;
+    const CHECKBOX = `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="1.5" y="1.5" width="13" height="13" rx="2"/><polyline points="5 8 7 10 11 6"/></svg>`;
+    const CODEBLOCK = `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 5 1 8 4 11"/><polyline points="12 5 15 8 12 11"/><line x1="8" y1="3" x2="8" y2="13"/></svg>`;
 
     const SEND_ATLAS = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4"><circle cx="12" cy="12" r="10"/><path d="M16 12l-4 4-4-4M12 8v8"/></svg>`;
 
@@ -403,11 +411,16 @@ export const EditorPane: React.FC<EditorPaneProps> = ({ onCommentsChange, onComm
       { type: 'item', label: 'Itálico',  icon: I, shortcut: '*',     onSelect: () => wrapSelection(view, '*') },
       { type: 'item', label: 'Riscado',  icon: S, shortcut: '~~',    onSelect: () => wrapSelection(view, '~~') },
       { type: 'item', label: 'Código inline', icon: CODE, shortcut: '`', onSelect: () => wrapSelection(view, '`') },
+      { type: 'item', label: 'Bloco de código', icon: CODEBLOCK, shortcut: '```', onSelect: () => insertCodeBlock(view) },
       { type: 'separator' },
       { type: 'item', label: 'Link',     icon: LINK, shortcut: '[]()',  onSelect: () => insertLink(view) },
+      { type: 'item', label: 'Imagem',   icon: IMAGE, shortcut: '![]()', onSelect: () => insertImage(view) },
+      { type: 'separator' },
       { type: 'item', label: 'Citação',  icon: QUOTE, shortcut: '>',    onSelect: () => toggleLinePrefix(view, '>') },
       { type: 'item', label: 'Lista',    icon: LIST, shortcut: '-',     onSelect: () => toggleLinePrefix(view, '-') },
+      { type: 'item', label: 'Checkbox', icon: CHECKBOX, shortcut: '- [ ]', onSelect: () => insertCheckbox(view) },
       { type: 'item', label: 'Régua',    icon: HR, shortcut: '---',     onSelect: () => insertHorizontalRule(view) },
+      { type: 'item', label: 'Tabela',   icon: TABLE, onSelect: () => insertTable(view) },
       { type: 'separator' },
       { type: 'item', label: 'Aumentar recuo', icon: INDENT, shortcut: 'Tab',  onSelect: () => changeIndent(view, 2) },
       { type: 'item', label: 'Diminuir recuo', icon: OUTDENT, shortcut: 'Shift+Tab', onSelect: () => changeIndent(view, -2) },
