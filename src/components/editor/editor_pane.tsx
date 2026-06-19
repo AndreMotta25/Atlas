@@ -5,8 +5,10 @@ import { markdown } from '@codemirror/lang-markdown';
 import {
   syntaxHighlighting,
   defaultHighlightStyle,
+  HighlightStyle,
   bracketMatching,
 } from '@codemirror/language';
+import { tags } from '@lezer/highlight';
 import { searchKeymap, highlightSelectionMatches } from '@codemirror/search';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useVaultStore } from '../../stores/vault_store';
@@ -30,6 +32,12 @@ import {
 } from './markdown_actions';
 
 const SAVE_DEBOUNCE_MS = 500;
+
+/** Custom highlight that removes the underline CodeMirror's defaultHighlightStyle
+ *  applies to all headings. Registered BEFORE the default so it takes precedence. */
+const noHeadingUnderline = syntaxHighlighting(
+  HighlightStyle.define([{ tag: tags.heading, textDecoration: 'none' }]),
+);
 
 interface EditorPaneProps {
   onCommentsChange: (comments: CommentEntry[]) => void;
@@ -216,6 +224,7 @@ export const EditorPane: React.FC<EditorPaneProps> = ({ onCommentsChange, onComm
         highlightActiveLine(),
         highlightSelectionMatches(),
         markdown(),
+        noHeadingUnderline,
         syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
         livePreviewModeField,
         livePreview,
@@ -236,10 +245,38 @@ export const EditorPane: React.FC<EditorPaneProps> = ({ onCommentsChange, onComm
       e.preventDefault();
       setMenuPos({ x: e.clientX, y: e.clientY });
     };
+    // ── Floating toolbar on text selection ──────────────────
+    let contextMenuFired = false;
+    const handleMouseUp = (e: MouseEvent) => {
+      if (e.button === 2) return; // right-click → contextmenu handles it
+      if (contextMenuFired) {
+        contextMenuFired = false;
+        return;
+      }
+      setTimeout(() => {
+        const v = viewRef.current;
+        if (!v) return;
+        const sel = v.state.selection.main;
+        if (sel.empty) {
+          setMenuPos(null);
+          return;
+        }
+        const coords = v.coordsAtPos(sel.to);
+        if (coords) {
+          setMenuPos({ x: coords.left, y: coords.bottom + 6 });
+        }
+      }, 80);
+    };
+    const onCtx = () => { contextMenuFired = true; };
+
     view.dom.addEventListener('contextmenu', handleContextMenu);
+    view.dom.addEventListener('contextmenu', onCtx);
+    view.dom.addEventListener('mouseup', handleMouseUp);
 
     return () => {
       view.dom.removeEventListener('contextmenu', handleContextMenu);
+      view.dom.removeEventListener('contextmenu', onCtx);
+      view.dom.removeEventListener('mouseup', handleMouseUp);
       view.destroy();
       if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     };
@@ -438,7 +475,7 @@ export const EditorPane: React.FC<EditorPaneProps> = ({ onCommentsChange, onComm
         </div>
         <div className="flex items-center gap-1 shrink-0">
           <button
-            onClick={() => onSetTab('comments')}
+            onClick={() => onSetTab(chatTab === 'comments' ? 'chat' : 'comments')}
             className={`p-1 rounded transition-colors shrink-0 ${
               chatTab === 'comments'
                 ? 'bg-primary text-primary-foreground'

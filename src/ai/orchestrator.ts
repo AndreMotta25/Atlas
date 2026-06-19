@@ -34,6 +34,10 @@ const SYSTEM_PROMPT = [
   '3. NUNCA assuma que a escrita foi aplicada. Aguarde o resultado da tool.',
   '4. Responda sempre em português. Seja conciso.',
   '5. Caminhos são relativos ao vault (ex: notas/gatos.md).',
+  '6. SEMPRE responda em Markdown bem formatado: use headings (##, ###), listas (- ou 1.),',
+  '   negrito (**destaque**), código com ``` blocos, tabelas quando apropriado.',
+  '   O usuário visualiza sua resposta como Markdown renderizado — use os recursos para',
+  '   deixar a resposta clara e organizada.',
 ].join('\n');
 
 const WRITE_TOOL_NAMES = new Set(['create_page', 'edit_page']);

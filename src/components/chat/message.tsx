@@ -22,40 +22,8 @@ export const Message: React.FC<MessageProps> = ({ message, streaming }) => {
 
   return (
     <div className={`flex flex-col gap-2 ${isUser ? 'items-end' : 'items-start'}`}>
-      <div
-        className={`max-w-[90%] rounded-lg px-3 py-2 text-sm ${
-          isUser
-            ? 'bg-primary text-primary-foreground'
-            : 'bg-muted text-foreground'
-        }`}
-      >
-        {isUser ? (
-          <div className="whitespace-pre-wrap">{message.content}</div>
-        ) : message.content ? (
-          <div className="max-w-none text-sm leading-relaxed [&_p]:my-1 [&_ul]:list-disc [&_ul]:pl-4 [&_ol]:list-decimal [&_ol]:pl-4 [&_pre]:bg-card [&_pre]:text-foreground [&_pre]:rounded [&_pre]:p-2 [&_code]:font-mono [&_code]:text-xs [&_h1]:font-bold [&_h1]:text-base [&_h2]:font-semibold [&_h2]:text-sm [&_a]:text-primary [&_a]:underline">
-            <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>{message.content}</ReactMarkdown>
-            {streaming && <span className="animate-pulse">▍</span>}
-          </div>
-        ) : streaming && message.content ? (
-          <div className="flex items-center gap-1 text-muted-foreground italic">
-            <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
-            digitando…
-          </div>
-        ) : streaming ? (
-          <div className="flex items-center gap-1.5 text-muted-foreground">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5 text-primary animate-pulse">
-              <circle cx="12" cy="12" r="10" />
-              <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
-              <path d="M12 17h.01" />
-            </svg>
-            <span className="italic">Pensando…</span>
-          </div>
-        ) : !hasToolCalls && !hasToolResults ? (
-          <div className="text-muted-foreground italic">(vazio)</div>
-        ) : null}
-      </div>
-
-      {/* Tool results (read-only tools — list_pages, read_page) */}
+      {/* Tool results (read-only tools — list_pages, read_page, search, get_backlinks)
+           appear BEFORE the assistant response so the user sees what was read/searched first. */}
       {hasToolResults && message.toolResults && (
         <div className="w-full max-w-[95%] flex flex-col gap-1.5">
           {message.toolResults.map((tr) => (
@@ -78,6 +46,29 @@ export const Message: React.FC<MessageProps> = ({ message, streaming }) => {
           ))}
         </div>
       )}
+
+      <div
+        className={`max-w-[90%] rounded-lg px-3 py-2 text-sm ${
+          isUser
+            ? 'bg-primary text-primary-foreground'
+            : 'bg-muted text-foreground'
+        }`}
+      >
+        {isUser ? (
+          <div className="whitespace-pre-wrap">{message.content}</div>
+        ) : message.content ? (
+          <div className="max-w-none text-sm leading-relaxed [&_p]:my-1 [&_ul]:list-disc [&_ul]:pl-4 [&_ol]:list-decimal [&_ol]:pl-4 [&_pre]:bg-card [&_pre]:text-foreground [&_pre]:rounded [&_pre]:p-2 [&_code]:font-mono [&_code]:text-xs [&_h1]:font-bold [&_h1]:text-base [&_h2]:font-semibold [&_h2]:text-sm [&_a]:text-primary [&_a]:underline">
+            <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>{message.content}</ReactMarkdown>
+            {streaming && <span className="animate-pulse">▍</span>}
+          </div>
+        ) : streaming ? (
+          /* Thinking/writing is now shown in the header — keep a minimal
+             placeholder so the bubble doesn't look empty while streaming. */
+          <div className="h-4" />
+        ) : !hasToolCalls && !hasToolResults ? (
+          <div className="text-muted-foreground italic">(vazio)</div>
+        ) : null}
+      </div>
     </div>
   );
 };

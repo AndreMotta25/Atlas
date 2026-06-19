@@ -233,58 +233,83 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
         <>
           {/* Header with actions */}
           <div className="flex items-center justify-between px-3 py-1.5 border-b border-border shrink-0">
-            <div ref={sessionMenuRef} className="relative">
-              <button
-                onClick={() => setSessionMenuOpen((o) => !o)}
-                className="flex items-center gap-1 px-1.5 py-0.5 hover:bg-accent rounded text-xs font-semibold uppercase tracking-wide text-muted-foreground hover:text-foreground transition-colors"
-                title="Histórico de conversas"
-              >
-                <span className="truncate max-w-[140px]">
-                  {activeSession?.title ?? 'Atlas'}
-                </span>
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-3 h-3 shrink-0">
-                  <polyline points="6 9 12 15 18 9" />
-                </svg>
-              </button>
-              {sessionMenuOpen && (
-                <div className="absolute left-0 top-full mt-1 z-50 min-w-[220px] max-h-[320px] overflow-auto bg-card border border-border rounded-lg shadow-lg py-1 text-sm">
-                  <button
-                    onClick={() => { setSessionMenuOpen(false); void newConversation(); }}
-                    className="w-full text-left px-3 py-1.5 hover:bg-accent flex items-center gap-2 text-foreground"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5 text-muted-foreground shrink-0">
-                      <line x1="12" y1="5" x2="12" y2="19" />
-                      <line x1="5" y1="12" x2="19" y2="12" />
-                    </svg>
-                    <span className="text-xs">Nova conversa</span>
-                  </button>
-                  {sessions.length > 0 && (
-                    <>
-                      <div className="h-px bg-border my-1" />
-                      {sessions.map((s) => (
-                        <button
-                          key={s.id}
-                          onClick={() => { setSessionMenuOpen(false); void loadConversation(s.id); }}
-                          className={`w-full text-left px-3 py-1.5 hover:bg-accent flex items-center gap-2 ${
-                            s.id === activeSession?.id ? 'bg-accent/50' : ''
-                          }`}
-                        >
-                          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5 text-muted-foreground shrink-0">
-                            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-                          </svg>
-                          <div className="flex-1 min-w-0">
-                            <span className="text-xs text-foreground block truncate">
-                              {s.title ?? 'Sem título'}
-                            </span>
-                            <span className="text-[10px] text-muted-foreground">
-                              {relativeTime(s.updatedAt)}
-                              {typeof s.messageCount === 'number' ? ` · ${s.messageCount} msgs` : ''}
-                            </span>
-                          </div>
-                        </button>
-                      ))}
-                    </>
-                  )}
+            <div className="flex items-center gap-2">
+              <div ref={sessionMenuRef} className="relative">
+                <button
+                  onClick={() => setSessionMenuOpen((o) => !o)}
+                  className="flex items-center gap-1 px-1.5 py-0.5 hover:bg-accent rounded text-xs font-semibold uppercase tracking-wide text-muted-foreground hover:text-foreground transition-colors"
+                  title="Histórico de conversas"
+                >
+                  <span className="truncate max-w-[140px]">
+                    {activeSession?.title ?? 'Atlas'}
+                  </span>
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-3 h-3 shrink-0">
+                    <polyline points="6 9 12 15 18 9" />
+                  </svg>
+                </button>
+                {sessionMenuOpen && (
+                  <div className="absolute left-0 top-full mt-1 z-50 min-w-[220px] max-h-[320px] overflow-auto bg-card border border-border rounded-lg shadow-lg py-1 text-sm">
+                    <button
+                      onClick={() => { setSessionMenuOpen(false); void newConversation(); }}
+                      className="w-full text-left px-3 py-1.5 hover:bg-accent flex items-center gap-2 text-foreground"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5 text-muted-foreground shrink-0">
+                        <line x1="12" y1="5" x2="12" y2="19" />
+                        <line x1="5" y1="12" x2="19" y2="12" />
+                      </svg>
+                      <span className="text-xs">Nova conversa</span>
+                    </button>
+                    {sessions.length > 0 && (
+                      <>
+                        <div className="h-px bg-border my-1" />
+                        {sessions.map((s) => (
+                          <button
+                            key={s.id}
+                            onClick={() => { setSessionMenuOpen(false); void loadConversation(s.id); }}
+                            className={`w-full text-left px-3 py-1.5 hover:bg-accent flex items-center gap-2 ${
+                              s.id === activeSession?.id ? 'bg-accent/50' : ''
+                            }`}
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5 text-muted-foreground shrink-0">
+                              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                            </svg>
+                            <div className="flex-1 min-w-0">
+                              <span className="text-xs text-foreground block truncate">
+                                {s.title ?? 'Sem título'}
+                              </span>
+                              <span className="text-[10px] text-muted-foreground">
+                                {relativeTime(s.updatedAt)}
+                                {typeof s.messageCount === 'number' ? ` · ${s.messageCount} msgs` : ''}
+                              </span>
+                            </div>
+                          </button>
+                        ))}
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Thinking / Writing indicator — animated dots */}
+              {streaming && (
+                <div className="flex items-center gap-1 ml-1">
+                  <span
+                    className="w-1.5 h-1.5 rounded-full bg-primary"
+                    style={{ animation: 'dot-bounce 1.4s ease-in-out infinite', animationDelay: '0s' }}
+                  />
+                  <span
+                    className="w-1.5 h-1.5 rounded-full bg-primary"
+                    style={{ animation: 'dot-bounce 1.4s ease-in-out infinite', animationDelay: '0.2s' }}
+                  />
+                  <span
+                    className="w-1.5 h-1.5 rounded-full bg-primary"
+                    style={{ animation: 'dot-bounce 1.4s ease-in-out infinite', animationDelay: '0.4s' }}
+                  />
+                  <span className="text-[11px] text-muted-foreground ml-0.5">
+                    {messages.length > 0 && messages[messages.length - 1].role === 'assistant' && messages[messages.length - 1].content
+                      ? 'Gerando resposta...'
+                      : 'Pensando...'}
+                  </span>
                 </div>
               )}
             </div>
@@ -328,21 +353,6 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
           </div>
 
           <div ref={scrollRef} className="flex-1 overflow-auto p-3 space-y-3">
-            {/* Thinking / Typing indicator when streaming */}
-            {streaming && (
-              <div className="flex items-center gap-2 px-2 py-1.5 mb-2 rounded-md bg-muted/50 border border-border/50 text-xs text-muted-foreground">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5 text-primary shrink-0">
-                  <circle cx="12" cy="12" r="10" />
-                  <path d="M12 6v6l4 2" />
-                </svg>
-                <span>
-                  {messages.length > 0 && messages[messages.length - 1].role === 'assistant' && messages[messages.length - 1].content
-                    ? 'Gerando resposta...'
-                    : 'Pensando...'}
-                </span>
-              </div>
-            )}
-
             {messages.length === 0 && (
               <p className="text-xs text-muted-foreground opacity-60 text-center mt-8">
                 Converse com o Atlas. Configure sua API key da DeepSeek nas configurações ⚙
