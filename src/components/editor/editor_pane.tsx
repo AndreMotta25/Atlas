@@ -32,9 +32,12 @@ interface EditorPaneProps {
   onCommentSelect: (index: number) => void;
   deleteCommentRef: React.MutableRefObject<((index: number) => void) | null>;
   updateCommentRef: React.MutableRefObject<((index: number, newComment: string) => void) | null>;
+  chatTab: 'chat' | 'comments';
+  onSetTab: (tab: 'chat' | 'comments') => void;
+  commentCount: number;
 }
 
-export const EditorPane: React.FC<EditorPaneProps> = ({ onCommentsChange, onCommentSelect, deleteCommentRef, updateCommentRef }) => {
+export const EditorPane: React.FC<EditorPaneProps> = ({ onCommentsChange, onCommentSelect, deleteCommentRef, updateCommentRef, chatTab, onSetTab, commentCount }) => {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const viewRef = useRef<EditorView | null>(null);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -412,8 +415,21 @@ export const EditorPane: React.FC<EditorPaneProps> = ({ onCommentsChange, onComm
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
-      <div className="px-4 py-2 border-b border-border flex items-center justify-between text-xs text-muted-foreground">
-        <span className="truncate">{currentPath ?? 'Nenhuma página selecionada'}</span>
+      <div className="px-4 py-1.5 border-b border-border flex items-center justify-between text-xs text-muted-foreground">
+        <div className="flex items-center gap-1 min-w-0 flex-1">
+          <button
+            onClick={() => onSetTab('comments')}
+            className={`text-xs px-2.5 py-1 rounded transition-colors shrink-0 ${
+              chatTab === 'comments'
+                ? 'bg-primary text-primary-foreground'
+                : 'text-muted-foreground hover:text-foreground hover:bg-accent'
+            }`}
+            title="Comentários"
+          >
+            📝 Comentários{commentCount > 0 ? ` (${commentCount})` : ''}
+          </button>
+          <span className="truncate ml-2">{currentPath ?? 'Nenhuma página selecionada'}</span>
+        </div>
         <div className="flex items-center gap-2 shrink-0">
           <button
             onClick={formatDocument}

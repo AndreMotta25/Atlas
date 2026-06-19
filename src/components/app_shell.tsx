@@ -214,6 +214,9 @@ export const AppShell: React.FC = () => {
           onCommentSelect={handleCommentSelect}
           deleteCommentRef={deleteCommentRef}
           updateCommentRef={updateCommentRef}
+          chatTab={chatTab}
+          onSetTab={setChatTab}
+          commentCount={comments.length}
         />
       </main>
 

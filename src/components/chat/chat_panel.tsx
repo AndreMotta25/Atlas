@@ -149,25 +149,6 @@ interface ChatPanelProps {
   onUpdateComment: (index: number, newComment: string) => void;
 }
 
-const TabButton: React.FC<{
-  active: boolean;
-  onClick: () => void;
-  label: string;
-  icon: string;
-}> = ({ active, onClick, label, icon }) => (
-  <button
-    onClick={onClick}
-    className={`text-xs px-2.5 py-1 rounded transition-colors ${
-      active
-        ? 'bg-primary text-primary-foreground'
-        : 'text-muted-foreground hover:text-foreground hover:bg-accent'
-    }`}
-  >
-    <span className="mr-1">{icon}</span>
-    {label}
-  </button>
-);
-
 export const ChatPanel: React.FC<ChatPanelProps> = ({
   chatTab,
   onSetTab,
@@ -212,22 +193,6 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
 
   return (
     <div className="flex flex-col h-full bg-background">
-      {/* Tabs */}
-      <div className="px-3 py-2 border-b border-border flex items-center gap-1">
-        <TabButton
-          active={chatTab === 'chat'}
-          onClick={() => onSetTab('chat')}
-          label="Atlas IA"
-          icon="💬"
-        />
-        <TabButton
-          active={chatTab === 'comments'}
-          onClick={() => onSetTab('comments')}
-          label={`Comentários${comments.length > 0 ? ` (${comments.length})` : ''}`}
-          icon="📝"
-        />
-      </div>
-
       {/* Chat view */}
       {chatTab === 'chat' && (
         <>
@@ -328,6 +293,19 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
       {/* Comments view */}
       {chatTab === 'comments' && (
         <>
+          {/* Back to Atlas button */}
+          <div className="px-3 py-2 border-b border-border flex items-center gap-1">
+            <button
+              onClick={() => onSetTab('chat')}
+              className="text-xs px-2.5 py-1 rounded text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+            >
+              ← Atlas
+            </button>
+            <span className="text-xs text-muted-foreground ml-1">
+              Comentários{comments.length > 0 ? ` (${comments.length})` : ''}
+            </span>
+          </div>
+
           {comments.length === 0 ? (
             <div className="flex-1 flex items-center justify-center p-6">
               <div className="text-center">
