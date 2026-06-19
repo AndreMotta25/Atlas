@@ -16,7 +16,7 @@ import type { SyntaxNode, SyntaxNodeRef } from '@lezer/common';
  * Regras:
  * - Esconde a marcação (##, **, *, `, [], (), >) e aplica tipografia.
  * - O preview é aplicado em TODAS as linhas, inclusive na linha ativa.
- * - Wiki-links ([[pagina]]) e tags (#tag) não são parseados pela gramática
+ * - Wiki-links ([[pagina]]) e @tags (@tag) não são parseados pela gramática
  *   padrão; tratamos via regex em texto "livre".
  *
  * Modo de debug (cicla com Alt+L):
@@ -245,10 +245,10 @@ function isInsideCodeBlock(state: EditorState, pos: number): boolean {
   return false;
 }
 
-// ─── Wiki-links & tags (regex pass) ──────────────────────────────
+// ─── Wiki-links & @tags (regex pass) ────────────────────────────────
 
 const WIKI_LINK_RE = /\[\[([^\]\n]+)\]\]/g;
-const TAG_RE = /(^|[\s(])#([a-zA-Z][\w/-]*)/g;
+const TAG_RE = /(^|[\s(])@([a-zA-Z][\w/-]*)/g;
 
 function decorateWikiLinksAndTags(view: EditorView, decos: Range<Decoration>[]) {
   const state = view.state;
@@ -267,7 +267,7 @@ function decorateWikiLinksAndTags(view: EditorView, decos: Range<Decoration>[]) 
     TAG_RE.lastIndex = 0;
     while ((m = TAG_RE.exec(text))) {
       const tagStart = from + m.index + m[1].length;
-      const tagEnd = tagStart + m[2].length + 1; // include the '#'
+      const tagEnd = tagStart + m[2].length + 1; // include the '@'
       if (isInsideCodeBlock(state, tagStart) || isInsideCodeBlock(state, tagEnd - 1)) continue;
       decos.push(Decoration.mark({ class: 'atlas-tag' }).range(tagStart, tagEnd));
     }

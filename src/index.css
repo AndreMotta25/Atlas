@@ -183,6 +183,198 @@ input {
   background: var(--color-muted);
 }
 
+/* ─── Gutters (line numbers + fold) ──────────────────────────── */
+.cm-editor .cm-gutter {
+  background: var(--color-background);
+  border-right: 1px solid var(--color-border);
+  color: var(--color-muted-foreground);
+  font-size: 0.8em;
+  min-width: 2.5em;
+  padding: 0 0.3em;
+}
+
+
+/* ─── Fold gutter ────────────────────────────────────────────── */
+.cm-editor .cm-foldGutter .cm-gutterElement {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 0.75em;
+  color: var(--color-muted-foreground);
+  transition: color 0.15s;
+  padding: 0 2px;
+}
+
+.cm-editor .cm-foldGutter .cm-gutterElement:hover {
+  color: var(--color-primary);
+}
+
+/* ─── Special characters ─────────────────────────────────────── */
+.cm-editor .cm-specialChar {
+  color: var(--color-warning);
+  opacity: 0.5;
+  font-size: 0.8em;
+}
+
+.cm-editor .cm-trailingWhitespace {
+  background-color: color-mix(in srgb, var(--color-destructive) 25%, transparent);
+  border-radius: 2px;
+}
+
+/* ─── Custom selection rendering ─────────────────────────────── */
+.cm-editor .cm-selectionBackground,
+.cm-editor.cm-focused .cm-selectionBackground,
+.cm-editor .cm-selectionLayer {
+  background: color-mix(in srgb, var(--color-primary) 22%, transparent) !important;
+}
+
+.cm-editor .cm-cursor,
+.cm-editor.cm-focused .cm-cursor {
+  border-left: 2px solid var(--color-foreground) !important;
+  border-left-color: var(--color-foreground) !important;
+}
+
+.cm-editor .cm-cursor-secondary {
+  border-left-color: var(--color-warning) !important;
+}
+
+/* ─── Rectangular selection / crosshair ──────────────────────── */
+.cm-editor .cm-crosshair {
+  cursor: crosshair;
+}
+
+.cm-editor .cm-rectangularSelection {
+  background: color-mix(in srgb, var(--color-primary) 18%, transparent);
+}
+
+/* ─── Drop cursor ────────────────────────────────────────────── */
+.cm-editor .cm-dropCursor {
+  border-left: 2px solid var(--color-primary) !important;
+  background: color-mix(in srgb, var(--color-primary) 30%, transparent);
+  animation: cm-dropCursor-blink 1.2s steps(1) infinite;
+}
+
+@keyframes cm-dropCursor-blink {
+  0%, 50% { opacity: 1; }
+  51%, 100% { opacity: 0; }
+}
+
+/* ─── Sticky header ──────────────────────────────────────────── */
+.atlas-sticky-header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  padding: 0.25em 2rem;
+  font-size: 0.85em;
+  font-weight: 700;
+  color: var(--color-muted-foreground);
+  background: color-mix(in srgb, var(--color-background) 92%, transparent);
+  backdrop-filter: blur(6px);
+  border-bottom: 1px solid var(--color-border);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: none;
+}
+
+/* ─── Autocomplete tooltip ───────────────────────────────────── */
+.cm-editor .cm-tooltip-autocomplete {
+  background: var(--color-card);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  font-size: 0.875em;
+  max-height: 16em;
+  overflow-y: auto;
+  color: var(--color-foreground);
+}
+
+.cm-editor .cm-tooltip-autocomplete ul li {
+  padding: 0.25em 0.75em;
+  cursor: pointer;
+  line-height: 1.6;
+}
+
+.cm-editor .cm-tooltip-autocomplete ul li[aria-selected] {
+  background: var(--color-accent);
+  color: var(--color-accent-foreground);
+}
+
+.cm-editor .cm-tooltip-autocomplete .cm-completionIcon {
+  opacity: 0.6;
+  width: 1.2em;
+  text-align: center;
+}
+
+.cm-editor .cm-tooltip-autocomplete .cm-completionDetail {
+  color: var(--color-muted-foreground);
+  margin-left: 0.75em;
+  font-size: 0.9em;
+}
+
+/* ─── Lint markers ───────────────────────────────────────────── */
+.cm-editor .cm-lintRange {
+  background-repeat: repeat-x;
+  background-position: center bottom;
+  padding-bottom: 2px;
+}
+
+.cm-editor .cm-lintRange-error {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns%3D%22http://www.w3.org/2000/svg%22 width%3D%226%22 height%3D%223%22%3E%3Cpath d%3D%22M0 2.5 L3 0.5 L6 2.5%22 fill%3D%22none%22 stroke%3D%22%23dc2626%22 stroke-width%3D%221%22 /%3E%3C/svg%3E");
+}
+
+.cm-editor .cm-lintRange-warning {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns%3D%22http://www.w3.org/2000/svg%22 width%3D%226%22 height%3D%223%22%3E%3Cpath d%3D%22M0 2.5 L3 0.5 L6 2.5%22 fill%3D%22none%22 stroke%3D%22%23d97706%22 stroke-width%3D%221%22 /%3E%3C/svg%3E");
+}
+
+.cm-editor .cm-lintRange-info {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns%3D%22http://www.w3.org/2000/svg%22 width%3D%226%22 height%3D%223%22%3E%3Cpath d%3D%22M0 2.5 L3 0.5 L6 2.5%22 fill%3D%22none%22 stroke%3D%22%234f46e5%22 stroke-width%3D%221%22 /%3E%3C/svg%3E");
+}
+
+/* Lint panel (appears at bottom of editor) */
+.cm-editor .cm-panel.cm-lint-panel {
+  background: var(--color-card);
+  border-top: 1px solid var(--color-border);
+  color: var(--color-foreground);
+  font-size: 0.8em;
+  padding: 0.25em 0.5em;
+}
+
+.cm-editor .cm-panel.cm-lint-panel .cm-lint-marker {
+  cursor: pointer;
+  padding: 0.1em 0.3em;
+  border-radius: 3px;
+}
+
+.cm-editor .cm-panel.cm-lint-panel .cm-lint-marker-error {
+  color: var(--color-destructive);
+}
+
+.cm-editor .cm-panel.cm-lint-panel .cm-lint-marker-warning {
+  color: var(--color-warning);
+}
+
+.cm-editor .cm-panel.cm-lint-panel .cm-lint-marker-info {
+  color: var(--color-primary);
+}
+
+/* ─── CodeMirror fold placeholder ────────────────────────────── */
+.cm-editor .cm-foldPlaceholder {
+  background: var(--color-muted);
+  border: 1px solid var(--color-border);
+  border-radius: 3px;
+  color: var(--color-muted-foreground);
+  padding: 0.1em 0.5em;
+  font-size: 0.85em;
+  cursor: pointer;
+}
+
+.cm-editor .cm-foldPlaceholder:hover {
+  background: var(--color-accent);
+  color: var(--color-accent-foreground);
+}
+
 /* ─── Atlas Live Preview — tipografia ───────────────────────────── */
 /* Headings — text-decoration: none overrides CodeMirror's defaultHighlightStyle
    which applies underline to all heading tags by default. */

@@ -1,5 +1,14 @@
 import { EditorState } from '@codemirror/state';
-import { EditorView, keymap, highlightActiveLine } from '@codemirror/view';
+import {
+  EditorView,
+  keymap,
+  highlightActiveLine,
+  highlightSpecialChars,
+  highlightTrailingWhitespace,
+  dropCursor,
+  drawSelection,
+  rectangularSelection,
+} from '@codemirror/view';
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands';
 import { markdown } from '@codemirror/lang-markdown';
 import {
@@ -7,14 +16,23 @@ import {
   defaultHighlightStyle,
   HighlightStyle,
   bracketMatching,
+  foldGutter,
+  foldKeymap,
+  codeFolding,
 } from '@codemirror/language';
 import { tags } from '@lezer/highlight';
 import { searchKeymap, highlightSelectionMatches } from '@codemirror/search';
+import { closeBrackets, closeBracketsKeymap, autocompletion } from '@codemirror/autocomplete';
+import { linter } from '@codemirror/lint';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useVaultStore } from '../../stores/vault_store';
 import { useChatStore } from '../../stores/chat_store';
 import { livePreview, livePreviewModeField, setLivePreviewMode, type LivePreviewMode } from './live_preview';
 import { formatMarkdown } from './format_markdown';
+import { atlasCompletionSources } from './autocomplete_source';
+import { markdownLintSource } from './markdown_lint';
+import { markdownFoldService } from './markdown_fold';
+import { stickyHeaderPlugin } from './sticky_header';
 import { ContextMenu, type MenuEntry } from './context_menu';
 import { CommentPopup } from './comment_popup';
 import type { CommentEntry } from '../app_shell';
@@ -219,20 +237,54 @@ export const EditorPane: React.FC<EditorPaneProps> = ({ onCommentsChange, onComm
     const state = EditorState.create({
       doc: '',
       extensions: [
+        // ── Fold gutter ────────────────────────────────────
+        foldGutter(),
+
+        // ── Editing behaviour ──────────────────────────────
         history(),
         bracketMatching(),
+        closeBrackets(),
         highlightActiveLine(),
         highlightSelectionMatches(),
+        highlightSpecialChars(),
+        highlightTrailingWhitespace(),
+        dropCursor(),
+        drawSelection(),
+        rectangularSelection(),
+        EditorState.allowMultipleSelections.of(true),
+
+        // ── Markdown language & folding ────────────────────
         markdown(),
+        markdownFoldService,
+        codeFolding(),
+
+        // ── Syntax highlighting ────────────────────────────
         noHeadingUnderline,
         syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
+
+        // ── Autocomplete ───────────────────────────────────
+        autocompletion({ override: atlasCompletionSources }),
+
+        // ── Linting ────────────────────────────────────────
+        linter(markdownLintSource, { delay: 1000 }),
+
+        // ── Live preview ───────────────────────────────────
         livePreviewModeField,
         livePreview,
+
+        // ── Sticky headers ─────────────────────────────────
+        stickyHeaderPlugin,
+
+        // ── Keymaps ────────────────────────────────────────
         keymap.of([
           ...defaultKeymap,
           ...historyKeymap,
           ...searchKeymap,
+          ...foldKeymap,
+          ...closeBracketsKeymap,
         ]),
+
+        // ── Misc ───────────────────────────────────────────
         updateListener,
         EditorView.lineWrapping,
       ],
