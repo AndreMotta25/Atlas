@@ -17,15 +17,23 @@ interface ChatState {
   activeRequestId: string | null;
   error: string | null;
   unsubscribe: (() => void) | null;
-  /** Page loaded into Atlas context via right-click → "Enviar para o Atlas". */
-  contextPage: string | null;
+  /** Pages loaded into Atlas context via right-click → "Enviar para o Atlas". */
+  contextPages: string[];
+  /** Text snippets sent to Atlas context via editor selection. */
+  contextSnippets: string[];
 
   init: () => () => void;
   send: (text: string) => Promise<void>;
   cancel: () => Promise<void>;
   reset: () => void;
   /** Load a page into chat context without triggering an AI response. */
-  loadPageContext: (path: string | null) => void;
+  loadPageContext: (path: string) => void;
+  /** Remove a single page from the context. */
+  removePageContext: (path: string) => void;
+  /** Add a text snippet to the context. */
+  loadSnippetContext: (snippet: string) => void;
+  /** Remove a text snippet from the context by index. */
+  removeSnippetContext: (index: number) => void;
 
   // Tool confirmation flow
   confirmToolCall: (toolCallId: string) => Promise<void>;
@@ -39,7 +47,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
   activeRequestId: null,
   error: null,
   unsubscribe: null,
-  contextPage: null,
+  contextPages: [],
+  contextSnippets: [],
 
   init: () => {
     const offToken = api.ai.onToken((chunk: ChatStreamChunk) => {
@@ -118,10 +127,15 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
   send: async (text) => {
     if (get().streaming) return;
-    const { contextPage } = get();
-    // Inject context page info into the message sent to the AI (not shown in UI).
-    const effectiveText = contextPage
-      ? `[Página carregada: ${contextPage}]\n\n${text}`
+    const { contextPages, contextSnippets } = get();
+    // Inject context pages/snippets into the message sent to the AI (not shown in UI).
+    const parts: string[] = [];
+    if (contextPages.length > 0) parts.push(`Páginas carregadas: ${contextPages.join(', ')}`);
+    if (contextSnippets.length > 0) {
+      parts.push(`Trechos selecionados:\n${contextSnippets.map((s, i) => `[${i + 1}] ${s}`).join('\n')}`);
+    }
+    const effectiveText = parts.length > 0
+      ? `[${parts.join(' | ')}]\n\n${text}`
       : text;
     const userMsg: ChatMessage = { id: newId(), role: 'user', content: text };
     const assistantId = newId();
@@ -132,7 +146,6 @@ export const useChatStore = create<ChatState>((set, get) => ({
       streaming: true,
       activeRequestId: assistantId,
       error: null,
-      contextPage: null,
     }));
 
     // Build history using the effective text (with page context) so the AI
@@ -174,10 +187,30 @@ export const useChatStore = create<ChatState>((set, get) => ({
   reset: () => {
     const { unsubscribe } = get();
     if (unsubscribe) unsubscribe();
-    set({ messages: [], streaming: false, activeRequestId: null, error: null, unsubscribe: null, contextPage: null });
+    set({ messages: [], streaming: false, activeRequestId: null, error: null, unsubscribe: null, contextPages: [], contextSnippets: [] });
   },
 
-  loadPageContext: (path) => set({ contextPage: path }),
+  loadPageContext: (path) =>
+    set((s) => ({
+      contextPages: s.contextPages.includes(path)
+        ? s.contextPages
+        : [...s.contextPages, path],
+    })),
+
+  removePageContext: (path) =>
+    set((s) => ({
+      contextPages: s.contextPages.filter((p) => p !== path),
+    })),
+
+  loadSnippetContext: (snippet) =>
+    set((s) => ({
+      contextSnippets: [...s.contextSnippets, snippet],
+    })),
+
+  removeSnippetContext: (index) =>
+    set((s) => ({
+      contextSnippets: s.contextSnippets.filter((_, i) => i !== index),
+    })),
 
   confirmToolCall: async (toolCallId) => {
     const state = get();

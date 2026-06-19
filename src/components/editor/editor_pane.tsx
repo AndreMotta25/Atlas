@@ -10,6 +10,7 @@ import {
 import { searchKeymap, highlightSelectionMatches } from '@codemirror/search';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useVaultStore } from '../../stores/vault_store';
+import { useChatStore } from '../../stores/chat_store';
 import { livePreview } from './live_preview';
 import { formatMarkdown } from './format_markdown';
 import { ContextMenu, type MenuEntry } from './context_menu';
@@ -339,9 +340,27 @@ export const EditorPane: React.FC<EditorPaneProps> = ({ onCommentsChange, onComm
     });
   };
 
+  const sendSelectionToAtlas = () => {
+    const view = viewRef.current;
+    if (!view) return;
+    const text = view.state.sliceDoc(
+      view.state.selection.main.from,
+      view.state.selection.main.to,
+    );
+    if (!text.trim()) return;
+    const chatStore = useChatStore.getState();
+    chatStore.loadSnippetContext(text);
+    // Also load the current page so Atlas has context about where the snippet came from.
+    if (currentPath) {
+      chatStore.loadPageContext(currentPath);
+    }
+    setMenuPos(null);
+  };
+
   const buildMenu = (): MenuEntry[] => {
     const view = viewRef.current;
     if (!view) return [];
+    const hasSelection = !view.state.selection.main.empty;
     const H = `<svg viewBox="0 0 16 16" fill="currentColor"><text x="0" y="14" font-size="14" font-weight="bold" font-family="sans-serif">H</text></svg>`;
     const B = `<svg viewBox="0 0 16 16" fill="currentColor"><text x="0" y="14" font-size="14" font-weight="bold" font-family="serif">B</text></svg>`;
     const I = `<svg viewBox="0 0 16 16" fill="currentColor"><text x="0" y="14" font-size="14" font-style="italic" font-family="serif">I</text></svg>`;
@@ -355,7 +374,20 @@ export const EditorPane: React.FC<EditorPaneProps> = ({ onCommentsChange, onComm
     const OUTDENT = `<svg viewBox="0 0 16 16" fill="currentColor"><path d="M3 3h10v1H3V3Zm0 4h5v1H3V7Zm0 4h5v1H3v-1ZM8 7l2 2-2 2V7Z"/></svg>`;
     const COMMENT = `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2H3a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h5l3 3 2-2h0a1 1 0 0 0 1-1V3a1 1 0 0 0-1-1Z"/></svg>`;
 
+    const SEND_ATLAS = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4"><circle cx="12" cy="12" r="10"/><path d="M16 12l-4 4-4-4M12 8v8"/></svg>`;
+
     return [
+      ...(hasSelection
+        ? [
+            {
+              type: 'item' as const,
+              label: 'Enviar seleção para o Atlas',
+              icon: SEND_ATLAS,
+              onSelect: sendSelectionToAtlas,
+            },
+            { type: 'separator' as const },
+          ]
+        : []),
       { type: 'item', label: 'Título 1', shortcut: '#', icon: H, onSelect: () => setHeading(view, 1) },
       { type: 'item', label: 'Título 2', shortcut: '##', icon: H, onSelect: () => setHeading(view, 2) },
       { type: 'item', label: 'Título 3', shortcut: '###', icon: H, onSelect: () => setHeading(view, 3) },
