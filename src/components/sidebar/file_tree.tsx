@@ -314,8 +314,7 @@ export const FileTree: React.FC = () => {
     setCtxMenu(null);
     try {
       await openPage(path);
-      const send = useChatStore.getState().send;
-      await send(`Analise a página **${path}**.`);
+      useChatStore.getState().loadPageContext(path);
     } catch (err) {
       console.error('Falha ao carregar página para o Atlas:', err);
     }

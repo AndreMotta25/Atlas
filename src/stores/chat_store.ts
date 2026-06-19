@@ -17,11 +17,15 @@ interface ChatState {
   activeRequestId: string | null;
   error: string | null;
   unsubscribe: (() => void) | null;
+  /** Page loaded into Atlas context via right-click → "Enviar para o Atlas". */
+  contextPage: string | null;
 
   init: () => () => void;
   send: (text: string) => Promise<void>;
   cancel: () => Promise<void>;
   reset: () => void;
+  /** Load a page into chat context without triggering an AI response. */
+  loadPageContext: (path: string | null) => void;
 
   // Tool confirmation flow
   confirmToolCall: (toolCallId: string) => Promise<void>;
@@ -35,6 +39,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   activeRequestId: null,
   error: null,
   unsubscribe: null,
+  contextPage: null,
 
   init: () => {
     const offToken = api.ai.onToken((chunk: ChatStreamChunk) => {
@@ -113,6 +118,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
   send: async (text) => {
     if (get().streaming) return;
+    const { contextPage } = get();
+    // Inject context page info into the message sent to the AI (not shown in UI).
+    const effectiveText = contextPage
+      ? `[Página carregada: ${contextPage}]\n\n${text}`
+      : text;
     const userMsg: ChatMessage = { id: newId(), role: 'user', content: text };
     const assistantId = newId();
     const assistantMsg: ChatMessage = { id: assistantId, role: 'assistant', content: '' };
@@ -122,14 +132,17 @@ export const useChatStore = create<ChatState>((set, get) => ({
       streaming: true,
       activeRequestId: assistantId,
       error: null,
+      contextPage: null,
     }));
 
+    // Build history using the effective text (with page context) so the AI
+    // knows which page the user is referring to.
     const history = get().messages
       .filter((m) => m.id !== assistantId)
       .map((m) => ({
         id: m.id,
         role: m.role,
-        content: m.content,
+        content: m.id === userMsg.id ? effectiveText : m.content,
         toolCalls: m.toolCalls,
         toolResults: m.toolResults,
       }));
@@ -161,8 +174,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
   reset: () => {
     const { unsubscribe } = get();
     if (unsubscribe) unsubscribe();
-    set({ messages: [], streaming: false, activeRequestId: null, error: null, unsubscribe: null });
+    set({ messages: [], streaming: false, activeRequestId: null, error: null, unsubscribe: null, contextPage: null });
   },
+
+  loadPageContext: (path) => set({ contextPage: path }),
 
   confirmToolCall: async (toolCallId) => {
     const state = get();
