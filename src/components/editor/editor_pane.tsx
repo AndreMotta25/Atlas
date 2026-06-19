@@ -11,7 +11,7 @@ import { searchKeymap, highlightSelectionMatches } from '@codemirror/search';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useVaultStore } from '../../stores/vault_store';
 import { useChatStore } from '../../stores/chat_store';
-import { livePreview } from './live_preview';
+import { livePreview, livePreviewModeField, setLivePreviewMode, type LivePreviewMode } from './live_preview';
 import { formatMarkdown } from './format_markdown';
 import { ContextMenu, type MenuEntry } from './context_menu';
 import { CommentPopup } from './comment_popup';
@@ -49,6 +49,9 @@ export const EditorPane: React.FC<EditorPaneProps> = ({ onCommentsChange, onComm
   const dirty = useVaultStore((s) => s.dirty);
 
   const [menuPos, setMenuPos] = useState<{ x: number; y: number } | null>(null);
+
+  // Debug toggle for live preview mode (Alt+L cycles 0 → 1 → 2 → 0).
+  const [previewMode, setPreviewMode] = useState<LivePreviewMode>(0);
 
   // Live doc text — updated on every CodeMirror change, used to recompute
   // comments immediately (before the debounced save flushes currentContent).
@@ -210,6 +213,7 @@ export const EditorPane: React.FC<EditorPaneProps> = ({ onCommentsChange, onComm
         highlightSelectionMatches(),
         markdown(),
         syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
+        livePreviewModeField,
         livePreview,
         keymap.of([
           ...defaultKeymap,
@@ -446,6 +450,31 @@ export const EditorPane: React.FC<EditorPaneProps> = ({ onCommentsChange, onComm
             </svg>
           </button>
           <span>{dirty ? 'Salvando…' : 'Salvo'}</span>
+          <button
+            onClick={() => {
+              const view = viewRef.current;
+              if (!view) return;
+              const current = view.state.field(livePreviewModeField);
+              const next: LivePreviewMode = current === 0 ? 1 : current === 1 ? 2 : 0;
+              view.dispatch({ effects: setLivePreviewMode.of(next) });
+              setPreviewMode(next);
+            }}
+            className={`p-1 rounded transition-colors shrink-0 ${
+              previewMode === 0
+                ? 'text-muted-foreground hover:text-foreground hover:bg-accent'
+                : 'bg-yellow-500/20 text-yellow-700 dark:text-yellow-400 hover:bg-yellow-500/30'
+            }`}
+            title={`Preview: ${previewMode === 0 ? 'Full' : previewMode === 1 ? 'Syntax only' : 'Off'} — clica pra ciclar`}
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5">
+              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+              <circle cx="12" cy="12" r="3" />
+              {previewMode === 2 && <line x1="2" y1="2" x2="22" y2="22" strokeWidth="2" />}
+            </svg>
+            {previewMode !== 0 && (
+              <span className="text-[10px] ml-1 tabular-nums">{previewMode}</span>
+            )}
+          </button>
         </div>
       </div>
       <div ref={hostRef} className="flex-1 overflow-auto relative" />

@@ -1,4 +1,4 @@
-import { EditorState, Range } from '@codemirror/state';
+import { EditorState, Range, StateEffect, StateField } from '@codemirror/state';
 import {
   EditorView,
   ViewPlugin,
@@ -18,9 +18,31 @@ import type { SyntaxNodeRef } from '@lezer/common';
  * - O preview é aplicado em TODAS as linhas, inclusive na linha ativa.
  * - Wiki-links ([[pagina]]) e tags (#tag) não são parseados pela gramática
  *   padrão; tratamos via regex em texto "livre".
+ *
+ * Modo de debug (cicla com Alt+L):
+ *   0 = full (syntax tree + regex passes de ==, [[, #tag, <aside>, <!--)
+ *   1 = syntax only (apenas markdown grammar — sem regex passes)
+ *   2 = off (markdown cru, sem decorações)
  */
 
 const HEADING_RE = /^ATXHeading(\d)$/;
+
+// ─── Debug mode toggle ───────────────────────────────────────────
+export type LivePreviewMode = 0 | 1 | 2;
+
+/** Effect to change the live-preview mode at runtime. */
+export const setLivePreviewMode = StateEffect.define<LivePreviewMode>();
+
+/** StateField holding the current mode so the ViewPlugin can react. */
+export const livePreviewModeField = StateField.define<LivePreviewMode>({
+  create: () => 0,
+  update(value, tr) {
+    for (const e of tr.effects) {
+      if (e.is(setLivePreviewMode)) return e.value;
+    }
+    return value;
+  },
+});
 
 // ─── Widgets ─────────────────────────────────────────────────────
 
@@ -128,7 +150,7 @@ function decorateQuote(ref: SyntaxNodeRef, decos: Range<Decoration>[]) {
 const WIKI_LINK_RE = /\[\[([^\]\n]+)\]\]/g;
 const TAG_RE = /(^|[\s(])#([a-zA-Z][\w/-]*)/g;
 
-function decorateWikiLinksAndTags(view: EditorView, decos: Range<Decoration>[]) {
+function decorateWikiLinksAndTags(view: EditorView, decos: Range<Decoration>[], codeRanges: Array<{ from: number; to: number }>) {
   for (const { from, to } of view.visibleRanges) {
     const text = view.state.doc.sliceString(from, to);
     let m: RegExpExecArray | null;
@@ -137,6 +159,7 @@ function decorateWikiLinksAndTags(view: EditorView, decos: Range<Decoration>[]) 
     while ((m = WIKI_LINK_RE.exec(text))) {
       const start = from + m.index;
       const end = start + m[0].length;
+      if (overlapsAny(start, end, codeRanges)) continue;
       decos.push(Decoration.mark({ class: 'atlas-wikilink' }).range(start, end));
     }
 
@@ -144,6 +167,7 @@ function decorateWikiLinksAndTags(view: EditorView, decos: Range<Decoration>[]) 
     while ((m = TAG_RE.exec(text))) {
       const tagStart = from + m.index + m[1].length;
       const tagEnd = tagStart + m[2].length + 1; // include the '#'
+      if (overlapsAny(tagStart, tagEnd, codeRanges)) continue;
       decos.push(Decoration.mark({ class: 'atlas-tag' }).range(tagStart, tagEnd));
     }
   }
@@ -158,7 +182,7 @@ const COMMENT_RE = /<!--c:(.+?)-->/g;
 
 const ASIDE_RE = /<aside(\s[^>]*)?>([\s\S]*?)<\/aside>/g;
 
-function decorateAsideBlocks(view: EditorView, decos: Range<Decoration>[]) {
+function decorateAsideBlocks(view: EditorView, decos: Range<Decoration>[], codeRanges: Array<{ from: number; to: number }>) {
   for (const { from, to } of view.visibleRanges) {
     const text = view.state.doc.sliceString(from, to);
     ASIDE_RE.lastIndex = 0;
@@ -168,6 +192,7 @@ function decorateAsideBlocks(view: EditorView, decos: Range<Decoration>[]) {
       const innerStart = fullStart + m[0].indexOf('>') + 1;
       const innerEnd = fullStart + m[0].lastIndexOf('</aside>');
       const fullEnd = fullStart + m[0].length;
+      if (overlapsAny(fullStart, fullEnd, codeRanges)) continue;
       // Hide the opening and closing tags
       hideRange(fullStart, innerStart, decos);
       hideRange(innerEnd, fullEnd, decos);
@@ -181,7 +206,7 @@ function decorateAsideBlocks(view: EditorView, decos: Range<Decoration>[]) {
 
 // ─── Highlights & comments (regex pass) ──────────────────────────
 
-function decorateHighlightsAndComments(view: EditorView, decos: Range<Decoration>[]) {
+function decorateHighlightsAndComments(view: EditorView, decos: Range<Decoration>[], codeRanges: Array<{ from: number; to: number }>) {
   const state = view.state;
 
   for (const { from, to } of view.visibleRanges) {
@@ -192,6 +217,7 @@ function decorateHighlightsAndComments(view: EditorView, decos: Range<Decoration
     while ((m = HIGHLIGHT_RE.exec(text))) {
       const fullStart = from + m.index;
       const fullEnd = fullStart + m[0].length;
+      if (overlapsAny(fullStart, fullEnd, codeRanges)) continue;
       const contentStart = fullStart + 2; // after ==
       const contentEnd = fullEnd - 2;     // before ==
       // Hide the == marks
@@ -205,10 +231,37 @@ function decorateHighlightsAndComments(view: EditorView, decos: Range<Decoration
     while ((m = COMMENT_RE.exec(text))) {
       const start = from + m.index;
       const end = start + m[0].length;
+      if (overlapsAny(start, end, codeRanges)) continue;
       // Always hide the entire comment markup — comments only appear in the sidebar
       hideRange(start, end, decos);
     }
   }
+}
+
+/**
+ * Collect [from, to] ranges of FencedCode and InlineCode nodes from the syntax
+ * tree. The regex passes (highlights, comments, wiki-links, tags, asides) must
+ * skip these — applying decorations inside code corrupts CodeMirror's
+ * DOM↔document position mapping (cursor jumps to wrong location on click).
+ */
+function collectCodeRanges(state: EditorState): Array<{ from: number; to: number }> {
+  const ranges: Array<{ from: number; to: number }> = [];
+  syntaxTree(state).iterate({
+    enter: (ref) => {
+      if (ref.name === 'FencedCode' || ref.name === 'InlineCode' || ref.name === 'CodeBlock') {
+        ranges.push({ from: ref.from, to: ref.to });
+      }
+    },
+  });
+  return ranges;
+}
+
+/** True if [from, to] overlaps any of the given ranges. */
+function overlapsAny(from: number, to: number, ranges: Array<{ from: number; to: number }>): boolean {
+  for (const r of ranges) {
+    if (from < r.to && to > r.from) return true;
+  }
+  return false;
 }
 
 /** Find a comment adjacent to a position (looks forward up to 50 chars). */
@@ -221,7 +274,10 @@ export function findCommentAt(state: { doc: { sliceString: (from: number, to: nu
 
 // ─── Main builder ────────────────────────────────────────────────
 
-function buildDecorations(view: EditorView): DecorationSet {
+function buildDecorations(view: EditorView, mode: LivePreviewMode): DecorationSet {
+  // Mode 2 = completely off — raw markdown, no decorations.
+  if (mode === 2) return Decoration.none;
+
   const decos: Range<Decoration>[] = [];
   const state = view.state;
 
@@ -253,9 +309,16 @@ function buildDecorations(view: EditorView): DecorationSet {
     });
   }
 
-  decorateHighlightsAndComments(view, decos);
-  decorateWikiLinksAndTags(view, decos);
-  decorateAsideBlocks(view, decos);
+  // Mode 1 = syntax tree only — skip the regex-based passes that are the
+  // most likely source of false-positive decorations when text is pasted
+  // from external sources (the regexes don't respect code fences/inline code).
+  if (mode === 0) {
+    // Collect code ranges once so all regex passes can skip matches inside them.
+    const codeRanges = collectCodeRanges(state);
+    decorateHighlightsAndComments(view, decos, codeRanges);
+    decorateWikiLinksAndTags(view, decos, codeRanges);
+    decorateAsideBlocks(view, decos, codeRanges);
+  }
 
   return Decoration.set(decos, true);
 }
@@ -265,12 +328,17 @@ function buildDecorations(view: EditorView): DecorationSet {
 export const livePreview = ViewPlugin.fromClass(
   class {
     decorations: DecorationSet;
+    mode: LivePreviewMode;
     constructor(view: EditorView) {
-      this.decorations = buildDecorations(view);
+      this.mode = view.state.field(livePreviewModeField);
+      this.decorations = buildDecorations(view, this.mode);
     }
     update(update: ViewUpdate) {
-      if (update.docChanged || update.viewportChanged || update.selectionSet) {
-        this.decorations = buildDecorations(update.view);
+      const newMode = update.state.field(livePreviewModeField);
+      const modeChanged = newMode !== this.mode;
+      if (modeChanged || update.docChanged || update.viewportChanged || update.selectionSet) {
+        this.mode = newMode;
+        this.decorations = buildDecorations(update.view, newMode);
       }
     }
   },
