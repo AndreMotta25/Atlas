@@ -4,6 +4,7 @@ import './index.css';
 import { AppShell } from './components/app_shell';
 import { VaultPicker } from './components/vault_picker';
 import { useSettingsStore } from './stores/settings_store';
+import { LoadingSpinner } from './components/icons';
 
 // ─── Theme bootstrap: apply .dark class BEFORE React mounts (prevents flash) ───
 // Usa prefers-color-scheme do browser, que reflete o nativeTheme no Electron.
@@ -25,7 +26,12 @@ const App: React.FC = () => {
   }, [loadSettings]);
 
   if (!booted || !loaded) {
-    return <div className="flex items-center justify-center min-h-screen bg-background text-muted-foreground">Carregando…</div>;
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen bg-background gap-3">
+        <LoadingSpinner className="w-8 h-8 text-primary" />
+        <span className="text-sm text-muted-foreground">Carregando…</span>
+      </div>
+    );
   }
 
   return settings.vaultPath ? <AppShell /> : <VaultPicker />;

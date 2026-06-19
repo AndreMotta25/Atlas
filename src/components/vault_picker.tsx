@@ -2,6 +2,7 @@ import React from 'react';
 import { api } from '../lib/api';
 import { useSettingsStore } from '../stores/settings_store';
 import { useVaultStore } from '../stores/vault_store';
+import { BooksIcon } from './icons';
 
 interface VaultPickerProps {
   onPicked?: () => void;
@@ -22,8 +23,8 @@ export const VaultPicker: React.FC<VaultPickerProps> = ({ onPicked }) => {
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-background text-foreground">
-      <div className="max-w-md text-center px-8">
-        <div className="text-5xl mb-4">📚</div>
+      <div className="max-w-md text-center px-8 animate-slide-up">
+        <div className="mb-4 text-muted-foreground"><BooksIcon className="w-14 h-14" /></div>
         <h1 className="text-3xl font-bold mb-2">Bem-vindo ao Atlas</h1>
         <p className="text-muted-foreground mb-8">
           Escolha uma pasta no seu computador para ser o seu vault. Todas as suas notas em

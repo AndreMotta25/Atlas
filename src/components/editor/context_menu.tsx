@@ -50,7 +50,7 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({ x, y, items, onClose }
       ref={ref}
       role="menu"
       style={{ left, top }}
-      className="fixed z-50 min-w-[220px] bg-card border border-border rounded-lg shadow-lg dark:shadow-2xl py-1 text-sm"
+      className="fixed z-50 min-w-[220px] bg-card border border-border rounded-lg shadow-lg dark:shadow-2xl py-1 text-sm animate-scale-in"
     >
       {items.map((entry, i) => {
         if (entry.type === 'separator') {

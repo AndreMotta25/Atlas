@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { api } from '../../lib/api';
 import { useSettingsStore } from '../../stores/settings_store';
 import { useVaultStore } from '../../stores/vault_store';
 import { useTheme } from '../../hooks/use_theme';
 import type { AIProvider, ThemeMode } from '../../types';
+import { CloseIcon, SuccessIcon, WarningIcon } from '../icons';
 
 interface SettingsModalProps {
   onClose: () => void;
@@ -30,11 +31,21 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
   const [hasKey, setHasKey] = useState<boolean | null>(null);
   const [statusMsg, setStatusMsg] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [confirmVault, setConfirmVault] = useState(false);
 
   // Probe current key status for the active provider on mount.
   useEffect(() => {
     void api.settings.hasApiKey(settings.activeProvider).then(setHasKey);
   }, [settings.activeProvider]);
+
+  // Close on Escape key
+  useEffect(() => {
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKey);
+    return () => window.removeEventListener('keydown', handleKey);
+  }, [onClose]);
 
   const refreshKeyStatus = async () => {
     const has = await api.settings.hasApiKey(settings.activeProvider);
@@ -75,6 +86,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
   };
 
   const handleChangeVault = async () => {
+    if (!confirmVault) {
+      setConfirmVault(true);
+      return;
+    }
+    setConfirmVault(false);
     const status = await api.vault.select();
     if (status.configured) {
       await loadSettings();
@@ -89,15 +105,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
   ];
 
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-      <div className="bg-card rounded-lg shadow-xl dark:shadow-2xl w-full max-w-lg max-h-[80vh] overflow-auto">
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 animate-fade-in">
+      <div className="bg-card rounded-lg shadow-xl dark:shadow-2xl w-full max-w-lg max-h-[80vh] overflow-auto animate-scale-in">
         <header className="flex items-center justify-between px-5 py-3 border-b border-border">
           <h2 className="text-lg font-semibold text-foreground">Configurações</h2>
-          <button onClick={onClose} className="text-muted-foreground hover:text-foreground p-1 rounded transition-colors">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
-              <line x1="18" y1="6" x2="6" y2="18" />
-              <line x1="6" y1="6" x2="18" y2="18" />
-            </svg>
+          <button onClick={onClose} className="text-muted-foreground hover:text-foreground p-1 rounded transition-colors" aria-label="Fechar configurações">
+            <CloseIcon className="w-4 h-4" />
           </button>
         </header>
 
@@ -108,12 +121,26 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
             <p className="text-xs text-muted-foreground mb-2 truncate">
               {settings.vaultPath ?? '— nenhum —'}
             </p>
-            <button
-              onClick={handleChangeVault}
-              className="px-3 py-1 bg-muted hover:bg-accent rounded text-sm text-foreground"
-            >
-              Trocar vault
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleChangeVault}
+                className={`px-3 py-1 rounded text-sm ${
+                  confirmVault
+                    ? 'bg-destructive text-primary-foreground hover:brightness-90'
+                    : 'bg-muted hover:bg-accent text-foreground'
+                }`}
+              >
+                {confirmVault ? 'Confirmar troca de vault?' : 'Trocar vault'}
+              </button>
+              {confirmVault && (
+                <button
+                  onClick={() => setConfirmVault(false)}
+                  className="px-3 py-1 bg-muted hover:bg-accent rounded text-sm text-foreground"
+                >
+                  Cancelar
+                </button>
+              )}
+            </div>
           </section>
 
           {/* Tema */}
@@ -184,8 +211,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
               {hasKey === null
                 ? 'verificando…'
                 : hasKey
-                ? <span className="flex items-center gap-1"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5 text-success"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" /></svg> já configurada (criptografada com safeStorage).</span>
-                : <span className="flex items-center gap-1"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5 text-warning"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" /><line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" /></svg> nenhuma key configurada.</span>}
+                ? <span className="flex items-center gap-1"><SuccessIcon className="w-3.5 h-3.5 text-success" /> já configurada (criptografada com safeStorage).</span>
+                : <span className="flex items-center gap-1"><WarningIcon className="w-3.5 h-3.5 text-warning" /> nenhuma key configurada.</span>}
             </p>
             <div className="flex gap-2">
               <input

@@ -2,6 +2,10 @@ import { useEffect, useRef, useState } from 'react';
 import { useChatStore } from '../../stores/chat_store';
 import { Message } from './message';
 import type { CommentEntry } from '../app_shell';
+import {
+  PencilIcon, TrashIcon, QuoteIcon, PlusIcon, ChevronDown,
+  CompressIcon, Minus, ChatIcon, ChevronLeft, ChevronRight, CommentEmptyIcon, CloseIcon, FileIcon, HighlighterIcon,
+} from '../icons';
 
 /** Format a timestamp as a relative time string (pt-BR). */
 function relativeTime(ts: number): string {
@@ -16,28 +20,6 @@ function relativeTime(ts: number): string {
   if (day < 7) return `${day}d`;
   return new Date(ts).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
 }
-
-const PENCIL_ICON = (
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5">
-    <path d="M12 20h9" />
-    <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
-  </svg>
-);
-
-const TRASH_ICON = (
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5">
-    <polyline points="3 6 5 6 21 6" />
-    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-    <line x1="10" y1="11" x2="10" y2="17" />
-    <line x1="14" y1="11" x2="14" y2="17" />
-  </svg>
-);
-
-const QUOTE_ICON = (
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-3 h-3">
-    <path d="M9.5 7C7 7 5 9 5 11.5V18h6v-6H8.5c0-1.4 1.1-2.5 2.5-2.5V7H9.5zm9 0c-2.5 0-4.5 2-4.5 4.5V18h6v-6h-2.5c0-1.4 1.1-2.5 2.5-2.5V7h-1.5z" />
-  </svg>
-);
 
 interface CommentCardProps {
   comment: CommentEntry;
@@ -83,7 +65,7 @@ const CommentCard: React.FC<CommentCardProps> = ({
       }`}
     >
       <div className="flex items-start gap-2">
-        <div className="text-muted-foreground shrink-0 mt-0.5">{QUOTE_ICON}</div>
+        <div className="text-muted-foreground shrink-0 mt-0.5"><QuoteIcon className="w-3 h-3" /></div>
 
         <div className="flex-1 min-w-0">
           {/* Texto destacado */}
@@ -134,7 +116,7 @@ const CommentCard: React.FC<CommentCardProps> = ({
               title="Editar comentário"
               className="p-1 hover:bg-background rounded text-muted-foreground hover:text-foreground transition-colors"
             >
-              {PENCIL_ICON}
+              <PencilIcon className="w-3.5 h-3.5" />
             </button>
             <button
               onClick={(e) => {
@@ -144,7 +126,7 @@ const CommentCard: React.FC<CommentCardProps> = ({
               title="Apagar comentário"
               className="p-1 hover:bg-background rounded text-muted-foreground hover:text-destructive transition-colors"
             >
-              {TRASH_ICON}
+              <TrashIcon className="w-3.5 h-3.5" />
             </button>
           </div>
         )}
@@ -239,6 +221,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                   onClick={() => setSessionMenuOpen((o) => !o)}
                   className="flex items-center gap-1 px-1.5 py-0.5 hover:bg-accent rounded text-xs font-semibold uppercase tracking-wide text-muted-foreground hover:text-foreground transition-colors"
                   title="Histórico de conversas"
+                  aria-label="Histórico de conversas"
                 >
                   <span className="truncate max-w-[140px]">
                     {activeSession?.title ?? 'Atlas'}
@@ -248,7 +231,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                   </svg>
                 </button>
                 {sessionMenuOpen && (
-                  <div className="absolute left-0 top-full mt-1 z-50 min-w-[220px] max-h-[320px] overflow-auto bg-card border border-border rounded-lg shadow-lg py-1 text-sm">
+                  <div className="absolute left-0 top-full mt-1 z-50 min-w-[220px] max-h-[320px] overflow-auto bg-card border border-border rounded-lg shadow-lg py-1 text-sm animate-scale-in">
                     <button
                       onClick={() => { setSessionMenuOpen(false); void newConversation(); }}
                       className="w-full text-left px-3 py-1.5 hover:bg-accent flex items-center gap-2 text-foreground"
@@ -329,13 +312,9 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                   onClick={() => void compactConversation()}
                   className="p-1 hover:bg-accent rounded text-muted-foreground hover:text-foreground transition-colors"
                   title="Compactar conversa"
+                  aria-label="Compactar conversa"
                 >
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5">
-                    <polyline points="4 14 10 14 10 20" />
-                    <polyline points="20 10 14 10 14 4" />
-                    <line x1="14" y1="10" x2="21" y2="3" />
-                    <line x1="3" y1="21" x2="10" y2="14" />
-                  </svg>
+                  <CompressIcon className="w-3.5 h-3.5" />
                 </button>
               )}
               {onToggleChat && (
@@ -343,16 +322,15 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                   onClick={onToggleChat}
                   className="p-1 hover:bg-accent rounded text-muted-foreground hover:text-foreground transition-colors"
                   title="Minimizar chat"
+                  aria-label="Minimizar chat"
                 >
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5">
-                    <line x1="5" y1="12" x2="19" y2="12" />
-                  </svg>
+                  <Minus className="w-3.5 h-3.5" />
                 </button>
               )}
             </div>
           </div>
 
-          <div ref={scrollRef} className="flex-1 overflow-auto p-3 space-y-3">
+          <div ref={scrollRef} className="flex-1 overflow-auto p-3 space-y-3 animate-stagger">
             {messages.length === 0 && (
               <p className="text-xs text-muted-foreground opacity-60 text-center mt-8">
                 Converse com o Atlas. Configure sua API key da DeepSeek nas configurações ⚙
@@ -373,10 +351,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
             <div className="border-t border-border bg-accent/50 text-xs">
               {contextPages.map((p) => (
                 <div key={p} className="flex items-center gap-2 px-3 py-1.5 border-b border-border/50 last:border-b-0">
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5 text-primary shrink-0">
-                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                    <polyline points="14 2 14 8 20 8" />
-                  </svg>
+                  <FileIcon className="w-3.5 h-3.5 text-primary shrink-0" />
                   <span className="text-muted-foreground truncate flex-1" title={p}>
                     {p}
                   </span>
@@ -385,10 +360,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                     className="p-0.5 hover:bg-background rounded text-muted-foreground hover:text-foreground transition-colors shrink-0"
                     title="Remover página do contexto"
                   >
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-3 h-3">
-                      <line x1="18" y1="6" x2="6" y2="18" />
-                      <line x1="6" y1="6" x2="18" y2="18" />
-                    </svg>
+                    <CloseIcon className="w-3 h-3" />
                   </button>
                 </div>
               ))}
@@ -407,10 +379,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                     className="p-0.5 hover:bg-background rounded text-muted-foreground hover:text-foreground transition-colors shrink-0"
                     title="Remover trecho do contexto"
                   >
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-3 h-3">
-                      <line x1="18" y1="6" x2="6" y2="18" />
-                      <line x1="6" y1="6" x2="18" y2="18" />
-                    </svg>
+                    <CloseIcon className="w-3 h-3" />
                   </button>
                 </div>
               ))}
@@ -437,7 +406,8 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
             ) : (
               <button
                 type="submit"
-                className="px-3 py-1 bg-primary text-primary-foreground rounded text-sm hover:brightness-90"
+                disabled={!input.trim()}
+                className="px-3 py-1 bg-primary text-primary-foreground rounded text-sm hover:brightness-90 disabled:opacity-40 disabled:cursor-not-allowed transition-opacity"
               >
                 Enviar
               </button>
@@ -484,7 +454,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
               </div>
 
               {/* Lista de cards */}
-              <div className="flex-1 overflow-auto">
+              <div className="flex-1 overflow-auto animate-stagger">
                 {comments.map((c, i) => (
                   <CommentCard
                     key={i}

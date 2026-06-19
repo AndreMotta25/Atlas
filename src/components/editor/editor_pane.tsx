@@ -37,6 +37,9 @@ import { ContextMenu, type MenuEntry } from './context_menu';
 import { CommentPopup } from './comment_popup';
 import type { CommentEntry } from '../app_shell';
 import {
+  ChatIcon, FormatIcon, EyeIcon,
+} from '../icons';
+import {
   changeIndent,
   insertHorizontalRule,
   insertLink,
@@ -535,23 +538,28 @@ export const EditorPane: React.FC<EditorPaneProps> = ({ onCommentsChange, onComm
             }`}
             title={`Comentários${commentCount > 0 ? ` (${commentCount})` : ''}`}
           >
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5 shrink-0">
-              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-            </svg>
+            <ChatIcon className="w-3.5 h-3.5 shrink-0" />
           </button>
           <button
             onClick={formatDocument}
             title="Formatar Markdown"
             className="p-1 hover:bg-accent rounded text-muted-foreground hover:text-foreground transition-colors"
           >
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5">
-              <line x1="4" y1="6" x2="16" y2="6" />
-              <line x1="4" y1="12" x2="20" y2="12" />
-              <line x1="4" y1="18" x2="12" y2="18" />
-              <polyline points="18 16 20 14 22 16" />
-            </svg>
+            <FormatIcon className="w-3.5 h-3.5" />
           </button>
-          <span>{dirty ? 'Salvando…' : 'Salvo'}</span>
+          <span className="flex items-center gap-1.5 text-xs tabular-nums">
+            {dirty ? (
+              <>
+                <span className="save-dot-saving" />
+                Salvando…
+              </>
+            ) : (
+              <>
+                <span className="save-dot-saved" />
+                Salvo
+              </>
+            )}
+          </span>
           <button
             onClick={() => {
               const view = viewRef.current;
@@ -568,11 +576,9 @@ export const EditorPane: React.FC<EditorPaneProps> = ({ onCommentsChange, onComm
             }`}
             title={`Preview: ${previewMode === 0 ? 'Full' : previewMode === 1 ? 'Syntax only' : 'Off'} — clica pra ciclar`}
           >
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5">
-              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-              <circle cx="12" cy="12" r="3" />
-              {previewMode === 2 && <line x1="2" y1="2" x2="22" y2="22" strokeWidth="2" />}
-            </svg>
+            <span className={`relative inline-flex items-center ${previewMode === 2 ? 'atlas-eye-off' : ''}`}>
+              <EyeIcon className="w-3.5 h-3.5" />
+            </span>
             {previewMode !== 0 && (
               <span className="text-[10px] ml-1 tabular-nums">{previewMode}</span>
             )}
