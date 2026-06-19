@@ -93,8 +93,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
       <div className="bg-card rounded-lg shadow-xl dark:shadow-2xl w-full max-w-lg max-h-[80vh] overflow-auto">
         <header className="flex items-center justify-between px-5 py-3 border-b border-border">
           <h2 className="text-lg font-semibold text-foreground">Configurações</h2>
-          <button onClick={onClose} className="text-muted-foreground hover:text-foreground">
-            ✕
+          <button onClick={onClose} className="text-muted-foreground hover:text-foreground p-1 rounded transition-colors">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
           </button>
         </header>
 
@@ -181,8 +184,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
               {hasKey === null
                 ? 'verificando…'
                 : hasKey
-                ? '✅ já configurada (criptografada com safeStorage).'
-                : '⚠ nenhuma key configurada.'}
+                ? <span className="flex items-center gap-1"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5 text-success"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" /></svg> já configurada (criptografada com safeStorage).</span>
+                : <span className="flex items-center gap-1"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5 text-warning"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" /><line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" /></svg> nenhuma key configurada.</span>}
             </p>
             <div className="flex gap-2">
               <input

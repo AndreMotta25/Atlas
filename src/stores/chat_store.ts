@@ -39,6 +39,8 @@ interface ChatState {
   confirmToolCall: (toolCallId: string) => Promise<void>;
   rejectToolCall: (toolCallId: string) => Promise<void>;
   undoLast: () => Promise<void>;
+  /** Compact the conversation — replaces all messages with an AI-generated summary. */
+  compactConversation: () => Promise<void>;
 }
 
 export const useChatStore = create<ChatState>((set, get) => ({
@@ -252,6 +254,55 @@ export const useChatStore = create<ChatState>((set, get) => ({
       await api.undo.last();
     } catch (err) {
       set({ error: err instanceof Error ? err.message : String(err) });
+    }
+  },
+
+  compactConversation: async () => {
+    const state = get();
+    if (state.streaming || state.messages.length === 0) return;
+
+    set({ error: null });
+
+    // Show a compacting indicator
+    const indicatorId = newId();
+    set((s) => ({
+      messages: [
+        ...s.messages,
+        { id: indicatorId, role: 'user' as const, content: '🗜 Compactar conversa' },
+        { id: newId(), role: 'assistant' as const, content: '' },
+      ],
+      streaming: true,
+      activeRequestId: indicatorId + '-compact',
+    }));
+
+    try {
+      const result = await api.ai.compact(state.messages);
+      if (result.success && result.summary) {
+        set({
+          messages: [
+            {
+              id: newId(),
+              role: 'assistant',
+              content: `📋 **Conversa compactada**\n\n${result.summary}\n\n---\n*Esta é uma versão resumida da conversa anterior. Você pode continuar fazendo perguntas.*`,
+            },
+          ],
+          streaming: false,
+          activeRequestId: null,
+          error: null,
+        });
+      } else {
+        set({
+          streaming: false,
+          activeRequestId: null,
+          error: result.error ?? 'Falha ao compactar conversa.',
+        });
+      }
+    } catch (err) {
+      set({
+        streaming: false,
+        activeRequestId: null,
+        error: err instanceof Error ? err.message : String(err),
+      });
     }
   },
 }));

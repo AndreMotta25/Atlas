@@ -112,7 +112,7 @@ export interface ChatStartResult {
 }
 
 // ─── AI Tool Types ──────────────────────────────────────────────
-export type ToolKind = 'read_page' | 'list_pages' | 'create_page' | 'edit_page';
+export type ToolKind = 'read_page' | 'list_pages' | 'create_page' | 'edit_page' | 'search' | 'get_backlinks';
 
 export type EditPageMode = 'replace' | 'append' | 'replace_section';
 
@@ -189,4 +189,22 @@ export interface AppSettings {
   activeProvider: AIProvider;
   defaultModel: string;
   themeMode: ThemeMode;
+}
+
+// ─── Search / Index Types ───────────────────────────────────────
+export interface SearchResult {
+  path: string;
+  title: string;
+  /** Matched snippet (with FTS5 highlight markers stripped). */
+  snippet: string;
+  /** BM25 rank from FTS5 (lower = more relevant). */
+  rank: number;
+}
+
+export interface BacklinkResult {
+  /** Path of the page that contains the link. */
+  fromPath: string;
+  fromTitle: string;
+  /** The anchor/alias used in the link, if any. */
+  anchor: string | null;
 }

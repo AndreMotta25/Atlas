@@ -6,6 +6,7 @@ import chokidar from 'chokidar';
 import type { FSWatcher } from 'chokidar';
 import { createChannel } from '../types';
 import type { VaultChangeEvent, VaultTree } from '../types';
+import { Indexer } from './indexer';
 
 const IGNORED = new Set(['.git', '.obsidian', '.DS_Store', 'node_modules']);
 
@@ -17,6 +18,9 @@ class VaultManagerClass {
     this.stopWatch();
     this.root = absPath;
     this.startWatch();
+    // Kick off a full reindex in the background — the DB is the source of truth
+    // for search/backlinks/tags, so it must reflect the new vault from scratch.
+    void Indexer.reindexAll();
   }
 
   getRoot(): string | null {
@@ -129,6 +133,15 @@ class VaultManagerClass {
       const payload: VaultChangeEvent = { type, path: rel };
       for (const win of BrowserWindow.getAllWindows()) {
         win.webContents.send(createChannel('vault', 'changed'), payload);
+      }
+      // Keep the SQLite index in sync. Only `.md` files are tracked; directory
+      // events and non-markdown files are ignored by the indexer.
+      if (rel.toLowerCase().endsWith('.md')) {
+        if (type === 'unlink') {
+          Indexer.removePage(rel);
+        } else if (type === 'add' || type === 'change') {
+          void Indexer.indexPage(rel);
+        }
       }
     };
 

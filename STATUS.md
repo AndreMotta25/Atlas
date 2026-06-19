@@ -2,17 +2,17 @@
 
 > Acompanhamento de progresso. Especificação completa em `spec.md` e `architecture.md`.
 
-Última atualização: **2026-06-18**
+Última atualização: **2026-06-19**
 
 ---
 
 ## Etapa atual
 
-**Fase 2 — IA com Tools (sem SQLite) — ✅ Concluída**
+**Fase 2.5 — SQLite + Indexer — ✅ Concluída**
 
-A IA agora lê e propõe escritas no vault via tools (`read_page`, `list_pages`, `create_page`, `edit_page` em 3 modos). Cada escrita vira um card de confirmação no chat com preview, Aceitar/Rejeitar, e Desfazer pós-apply. Decisões travadas: **sem SQLite** (escritas direto no disco via `VaultManager`), **edit híbrido** (`replace`/`append`/`replace_section`), **sem grafo**.
+Vault agora tem índice SQLite (`better-sqlite3`) com FTS5, links `[[wiki-links]]`, tags `#tag` e busca full-text por conteúdo. Indexer roda em setRoot (rebuild completo) e incrementalmente a cada mudança observada pelo chokidar. A IA ganhou tools `search` (FTS5) e `get_backlinks`; a busca da sidebar agora usa FTS5 (instantânea, sem custo de LLM).
 
-Próxima etapa prevista: **Fase 2.5 — SQLite + Indexer** (destrava backlinks, search FTS5). Ver "O que falta" abaixo.
+Próxima etapa prevista: **Fase 3 — Rico** (wiki-links clicáveis, painel de backlinks, busca FTS5 já disponível via tool). Ver "O que falta" abaixo.
 
 ---
 
@@ -65,19 +65,26 @@ Próxima etapa prevista: **Fase 2.5 — SQLite + Indexer** (destrava backlinks, 
 | System prompt atualizado com regras das tools | ✅ | `orchestrator.ts` |
 | IPC type-safe: `tool:confirm`, `tool:reject`, `undo:last`, `ai:tool-pending`, `ai:tool-result` | ✅ | `tool_handlers.ts`, `preload.ts` |
 
+### Fase 2.5 — SQLite + Indexer — ✅ Concluída
+
+| Área | Implementado | Arquivos |
+|---|---|---|
+| **SQLite** (`better-sqlite3`) com schema `pages`/`links`/`tags`/`pages_fts` | ✅ | `src/vault/db.ts` |
+| Migration via `pragma user_version` + WAL mode | ✅ | `db.ts` |
+| `better-sqlite3` marcado como externo no webpack main | ✅ | `webpack.main.config.ts` |
+| **FTS5** com `unicode61 remove_diacritics 2` (busca accent-insensitive em PT) | ✅ | `db.ts` |
+| **Indexer** — parse de `[[wiki-links]]` (com alias/heading) e `#tags`, respeitando code fences | ✅ | `src/vault/indexer.ts` |
+| Title = primeiro H1 ou basename; links normalizados para `.md` | ✅ | `indexer.ts` |
+| **Reindex completo** em `setRoot` + **incremental** nos eventos do chokidar | ✅ | `vault/manager.ts`, `indexer.ts` |
+| **Busca por conteúdo** (FTS5 + BM25) — instantânea, sem custo de LLM | ✅ | `db.ts` (`search`), `ipc/search_handlers.ts`, `app_shell.tsx` |
+| **Backlinks** via tabela `links` | ✅ | `db.ts` (`getBacklinks`), `search_handlers.ts` |
+| **Tools IA** `search` e `get_backlinks` (auto-exec, read-only) | ✅ | `ai/tools.ts`, `orchestrator.ts` |
+| DB abre no `app.whenReady` e fecha no `before-quit` | ✅ | `src/index.ts` |
+| IPC type-safe: `vault:search`, `vault:backlinks` | ✅ | `search_handlers.ts`, `preload.ts` |
+
 ---
 
 ## O que falta
-
-### Fase 2.5 — SQLite + Indexer (próxima)
-
-- [ ] **SQLite** (`better-sqlite3`) — estava no escopo original da Fase 1, foi deferido.
-  - Tabelas: `pages`, `links`, `tags`, `pages_fts` (FTS5).
-  - Migration inicial + índices.
-  - Ver `.claude/rules/SQLite.md` para padrões.
-- [ ] **Indexer** — parse de `[[wiki-links]]` e `#tags` ao salvar; popular tabelas `links`/`tags`.
-- [ ] **Tools `search` e `get_backlinks`** para a IA (dependem do SQLite).
-- [ ] Política de **diff** — atualmente `replace` total; avaliar patch semântico no futuro.
 
 ### Fase 3 — Rico
 
@@ -85,7 +92,7 @@ Próxima etapa prevista: **Fase 2.5 — SQLite + Indexer** (destrava backlinks, 
 - [ ] **Backlinks** (painel mostrando páginas que apontam para a atual).
 - [ ] **Grafo visual** estilo Obsidian (a confirmar com usuário — arquitetura lista como ponto aberto).
 - [ ] **Tags** como índice navegável (depende do SQLite da Fase 2).
-- [ ] **Busca full-text** (FTS5) — painel de busca.
+- [ ] **Busca full-text** (FTS5) — painel de busca. _(busca via sidebar e tool IA já disponíveis; falta um painel dedicado com snippets/preview mais rico.)_
 - [ ] **Preview lado-a-lado** (opcional, alternável).
 
 ### Fase 4 — Multi-provider & RAG
@@ -113,6 +120,7 @@ Próxima etapa prevista: **Fase 2.5 — SQLite + Indexer** (destrava backlinks, 
 - Vercel AI SDK (`ai` + `@ai-sdk/openai`) — DeepSeek via `baseURL`
 - chokidar (file watching) · zustand (estado) · react-markdown + remark-gfm (chat)
 - safeStorage para credenciais · JSON em `userData` para settings
+- **better-sqlite3** (índice do vault: FTS5, links, tags) · DB em `userData/atlas.db`
 
 ---
 

@@ -3,6 +3,8 @@ import { registerAllHandlers } from './ipc';
 import { createChannel } from './types';
 import { ConfigStore } from './vault/config_store';
 import { initVaultFromConfig, VaultManager } from './vault/manager';
+import { DatabaseService } from './vault/db';
+import { Indexer } from './vault/indexer';
 
 declare const MAIN_WINDOW_WEBPACK_ENTRY: string;
 declare const MAIN_WINDOW_PRELOAD_WEBPACK_ENTRY: string;
@@ -70,8 +72,11 @@ if (!gotLock) {
     }
   });
 
-  app.whenReady().then(() => {
+  app.whenReady().then(async () => {
     registerAllHandlers();
+
+    // Open the SQLite index DB before any vault work touches it.
+    DatabaseService.open();
 
     // Restore persisted theme.
     const saved = ConfigStore.load().themeMode ?? 'system';
@@ -87,8 +92,16 @@ if (!gotLock) {
       });
     });
 
-    // Restore persisted vault path.
-    initVaultFromConfig(ConfigStore.load().vaultPath);
+    // Restore persisted vault path and kick off a full reindex.
+    const persistedVault = ConfigStore.load().vaultPath;
+    initVaultFromConfig(persistedVault);
+    if (persistedVault) {
+      try {
+        await Indexer.reindexAll();
+      } catch (err) {
+        console.error('[main] initial reindex failed:', err);
+      }
+    }
 
     // Permission handler
     session.defaultSession.setPermissionRequestHandler((_wc, permission, cb) => {
@@ -107,6 +120,7 @@ app.on('window-all-closed', () => {
 
 app.on('before-quit', () => {
   VaultManager.stopWatch();
+  DatabaseService.close();
 });
 
 app.on('activate', () => {

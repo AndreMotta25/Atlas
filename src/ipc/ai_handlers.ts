@@ -1,7 +1,12 @@
 import { ipcMain, BrowserWindow, type IpcMainInvokeEvent } from 'electron';
 import { randomUUID } from 'crypto';
+import { generateText } from 'ai';
 import { createChannel } from '../types';
 import { AIOrchestrator, type OrchestratorSinks } from '../ai/orchestrator';
+import { createDeepSeek } from '../ai/providers/deepseek';
+import { ConfigStore } from '../vault/config_store';
+import { SecureStore } from '../vault/secure_store';
+import { VaultManager } from '../vault/manager';
 import type {
   ChatMessage,
   ChatRequestOptions,
@@ -215,4 +220,118 @@ export const registerAIHandlers = (): void => {
     } satisfies ChatStreamChunk);
     return { success: true };
   });
+
+  // ── AI: Compact conversation ──
+  ipcMain.handle(
+    createChannel('ai', 'compact'),
+    async (_e, messages: ChatMessage[]) => {
+      const settings = ConfigStore.load();
+      const apiKey = SecureStore.getApiKey(settings.activeProvider);
+      if (!apiKey) return { success: false, error: 'Nenhuma API key configurada.' };
+
+      const chat = createDeepSeek(apiKey);
+      const model = chat(settings.defaultModel);
+
+      // Format conversation as text for the summary prompt
+      const conversationText = messages
+        .filter((m) => m.role !== 'system')
+        .map((m) => `**${m.role === 'user' ? 'Usuário' : 'Atlas'}**:\n${m.content}`)
+        .join('\n\n---\n\n');
+
+      try {
+        const result = await generateText({
+          model,
+          system: `Você é um assistente que resume conversas de forma concisa mas completa.
+Você receberá uma conversa entre um Usuário e o Atlas (um assistente de vault de notas).
+
+Instruções:
+- Resuma a conversa preservando: arquivos mencionados, decisões tomadas, alterações feitas, e contexto importante.
+- Use português claro e direto.
+- Mantenha o tom profissional.
+- Se houver ações pendentes, mencione-as.
+- Limite o resumo a no máximo 3 parágrafos.`,
+          messages: [
+            {
+              role: 'user',
+              content: `Aqui está a conversa para resumir:\n\n${conversationText}`,
+            },
+          ],
+        });
+
+        return { success: true, summary: result.text };
+      } catch (err) {
+        return {
+          success: false,
+          error: err instanceof Error ? err.message : String(err),
+        };
+      }
+    },
+  );
+
+  // ── AI: Search vault pages ──
+  ipcMain.handle(
+    createChannel('ai', 'search'),
+    async (_e, query: string, pagePaths: string[]) => {
+      const settings = ConfigStore.load();
+      const apiKey = SecureStore.getApiKey(settings.activeProvider);
+      if (!apiKey) return { success: false, error: 'Nenhuma API key configurada.' };
+
+      const chat = createDeepSeek(apiKey);
+      const model = chat(settings.defaultModel);
+
+      try {
+        const result = await generateText({
+          model,
+          system: `Você é um assistente de busca em vault de notas.
+Você receberá uma consulta do usuário e a lista de páginas disponíveis no vault.
+
+Sua tarefa é:
+1. Analisar a consulta do usuário
+2. Selecionar as páginas MAIS RELEVANTES (máximo 8) com base no nome do arquivo
+3. Para cada página selecionada, explique BREVEMENTE por que é relevante
+
+Responda APENAS com um JSON válido no seguinte formato:
+{
+  "results": [
+    {"path": "caminho/da/pagina.md", "reason": "motivo da relevância"},
+    ...
+  ]
+}
+
+Se nenhuma página for relevante, retorne {"results": []}.`,
+          messages: [
+            {
+              role: 'user',
+              content: `Consulta: "${query}"\n\nPáginas disponíveis:\n${pagePaths.join('\n')}`,
+            },
+          ],
+        });
+
+        // Parse the JSON response
+        try {
+          const parsed = JSON.parse(result.text);
+          return {
+            success: true,
+            results: Array.isArray(parsed.results) ? parsed.results : [],
+          };
+        } catch {
+          // If the AI didn't return valid JSON, try to extract it
+          const jsonMatch = result.text.match(/\{[\s\S]*"results"[\s\S]*\}/);
+          if (jsonMatch) {
+            const parsed = JSON.parse(jsonMatch[0]);
+            return {
+              success: true,
+              results: Array.isArray(parsed.results) ? parsed.results : [],
+            };
+          }
+          return { success: true, results: [] };
+        }
+      } catch (err) {
+        return {
+          success: false,
+          error: err instanceof Error ? err.message : String(err),
+        };
+      }
+    },
+  );
 };

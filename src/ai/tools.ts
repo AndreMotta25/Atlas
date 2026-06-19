@@ -1,6 +1,7 @@
 import { tool } from 'ai';
 import { z } from 'zod';
 import { VaultManager } from '../vault/manager';
+import { DatabaseService } from '../vault/db';
 import type { ToolSet } from 'ai';
 
 /**
@@ -109,11 +110,75 @@ const editPageTool = tool({
   }),
 });
 
+const searchTool = tool({
+  description:
+    'Busca full-text no conteúdo de todas as páginas do vault (FTS5). ' +
+    'Use para encontrar páginas que mencionam um termo, mesmo que ele não esteja ' +
+    'no nome do arquivo. Retorna path, título e um trecho do conteúdo.',
+  inputSchema: z.object({
+    query: z.string().describe('Termo ou frase de busca.'),
+    limit: z
+      .number()
+      .int()
+      .positive()
+      .max(50)
+      .optional()
+      .describe('Número máximo de resultados (padrão 20).'),
+  }),
+  execute: async ({ query, limit }) => {
+    try {
+      const results = DatabaseService.search(query, limit ?? 20);
+      return {
+        success: true,
+        count: results.length,
+        query,
+        results,
+      };
+    } catch (err) {
+      return {
+        success: false,
+        query,
+        error: err instanceof Error ? err.message : String(err),
+      };
+    }
+  },
+});
+
+const getBacklinksTool = tool({
+  description:
+    'Lista as páginas do vault que apontam (via [[wiki-link]]) para a página informada. ' +
+    'Use quando o usuário perguntar "o que referencia X?" ou "quem aponta para Y?".',
+  inputSchema: z.object({
+    path: z
+      .string()
+      .describe('Caminho relativo da página alvo (ex: "notas/gatos.md").'),
+  }),
+  execute: async ({ path }) => {
+    try {
+      const backlinks = DatabaseService.getBacklinks(path);
+      return {
+        success: true,
+        path,
+        count: backlinks.length,
+        backlinks,
+      };
+    } catch (err) {
+      return {
+        success: false,
+        path,
+        error: err instanceof Error ? err.message : String(err),
+      };
+    }
+  },
+});
+
 export const TOOLS: ToolSet = {
   read_page: readPageTool,
   list_pages: listPagesTool,
   create_page: createPageTool,
   edit_page: editPageTool,
+  search: searchTool,
+  get_backlinks: getBacklinksTool,
 };
 
 export const WRITE_TOOLS = new Set<string>(['create_page', 'edit_page']);

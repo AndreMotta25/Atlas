@@ -147,6 +147,7 @@ interface ChatPanelProps {
   onCommentIndexChange: (index: number) => void;
   onDeleteComment: (index: number) => void;
   onUpdateComment: (index: number, newComment: string) => void;
+  onToggleChat?: () => void;
 }
 
 export const ChatPanel: React.FC<ChatPanelProps> = ({
@@ -157,6 +158,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   onCommentIndexChange,
   onDeleteComment,
   onUpdateComment,
+  onToggleChat,
 }) => {
   const messages = useChatStore((s) => s.messages);
   const streaming = useChatStore((s) => s.streaming);
@@ -164,6 +166,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   const send = useChatStore((s) => s.send);
   const cancel = useChatStore((s) => s.cancel);
   const activeRequestId = useChatStore((s) => s.activeRequestId);
+  const compactConversation = useChatStore((s) => s.compactConversation);
   const contextPages = useChatStore((s) => s.contextPages);
   const contextSnippets = useChatStore((s) => s.contextSnippets);
   const removePageContext = useChatStore((s) => s.removePageContext);
@@ -196,7 +199,56 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
       {/* Chat view */}
       {chatTab === 'chat' && (
         <>
+          {/* Header with actions */}
+          <div className="flex items-center justify-between px-3 py-1.5 border-b border-border shrink-0">
+            <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Atlas
+            </span>
+            <div className="flex items-center gap-0.5">
+              {messages.length > 2 && !streaming && (
+                <button
+                  onClick={() => void compactConversation()}
+                  className="p-1 hover:bg-accent rounded text-muted-foreground hover:text-foreground transition-colors"
+                  title="Compactar conversa"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5">
+                    <polyline points="4 14 10 14 10 20" />
+                    <polyline points="20 10 14 10 14 4" />
+                    <line x1="14" y1="10" x2="21" y2="3" />
+                    <line x1="3" y1="21" x2="10" y2="14" />
+                  </svg>
+                </button>
+              )}
+              {onToggleChat && (
+                <button
+                  onClick={onToggleChat}
+                  className="p-1 hover:bg-accent rounded text-muted-foreground hover:text-foreground transition-colors"
+                  title="Minimizar chat"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5">
+                    <line x1="5" y1="12" x2="19" y2="12" />
+                  </svg>
+                </button>
+              )}
+            </div>
+          </div>
+
           <div ref={scrollRef} className="flex-1 overflow-auto p-3 space-y-3">
+            {/* Thinking / Typing indicator when streaming */}
+            {streaming && (
+              <div className="flex items-center gap-2 px-2 py-1.5 mb-2 rounded-md bg-muted/50 border border-border/50 text-xs text-muted-foreground">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5 text-primary shrink-0">
+                  <circle cx="12" cy="12" r="10" />
+                  <path d="M12 6v6l4 2" />
+                </svg>
+                <span>
+                  {messages.length > 0 && messages[messages.length - 1].role === 'assistant' && messages[messages.length - 1].content
+                    ? 'Gerando resposta...'
+                    : 'Pensando...'}
+                </span>
+              </div>
+            )}
+
             {messages.length === 0 && (
               <p className="text-xs text-muted-foreground opacity-60 text-center mt-8">
                 Converse com o Atlas. Configure sua API key da DeepSeek nas configurações ⚙

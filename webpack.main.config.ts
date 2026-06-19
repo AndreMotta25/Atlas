@@ -9,6 +9,10 @@ export const mainConfig: Configuration = {
    * that runs in the main process.
    */
   entry: './src/index.ts',
+  // Native modules must not be bundled — resolve at runtime from node_modules.
+  externals: {
+    'better-sqlite3': 'commonjs better-sqlite3',
+  },
   // Put your normal webpack config below here
   module: {
     rules,

@@ -9,6 +9,7 @@ import { registerVaultHandlers } from './vault_handlers';
 import { registerSettingsHandlers } from './settings_handlers';
 import { registerAIHandlers } from './ai_handlers';
 import { registerToolHandlers } from './tool_handlers';
+import { registerSearchHandlers } from './search_handlers';
 
 export const registerAllHandlers = (): void => {
   registerFileHandlers();
@@ -22,4 +23,5 @@ export const registerAllHandlers = (): void => {
   registerSettingsHandlers();
   registerAIHandlers();
   registerToolHandlers();
+  registerSearchHandlers();
 };

@@ -18,6 +18,9 @@ const SYSTEM_PROMPT = [
   'Ferramentas disponíveis:',
   '- read_page({ path }) — lê uma página .md do vault',
   '- list_pages({ filter? }) — lista páginas, com filtro opcional por substring',
+  '- search({ query, limit? }) — busca full-text no CONTEÚDO de todas as páginas',
+  '  (FTS5). Use quando o usuário procurar um termo que pode não estar no nome do arquivo.',
+  '- get_backlinks({ path }) — lista páginas que apontam para a página informada',
   '- create_page({ path, content }) — cria uma nova página (REQUER CONFIRMAÇÃO)',
   '- edit_page({ path, mode, content, section? }) — edita página (REQUER CONFIRMAÇÃO)',
   '  · mode "replace": substitui todo o conteúdo',
@@ -26,7 +29,7 @@ const SYSTEM_PROMPT = [
   '    (texto do heading SEM o prefixo #)',
   '',
   'REGRAS:',
-  '1. Para responder sobre o vault, use read_page e list_pages livremente.',
+  '1. Para responder sobre o vault, use read_page, list_pages, search e get_backlinks livremente.',
   '2. Para criar/editar, PROVENHA a operação via tool — o usuário confirmará.',
   '3. NUNCA assuma que a escrita foi aplicada. Aguarde o resultado da tool.',
   '4. Responda sempre em português. Seja conciso.',
@@ -146,15 +149,10 @@ class AIOrchestratorClass {
               | undefined;
             sinks.toolResult?.({
               toolCallId: part.toolCallId,
-              toolName: part.toolName as PendingToolCall['toolName'] | 'read_page' | 'list_pages',
+              toolName: part.toolName as PendingToolCall['toolName'] | 'read_page' | 'list_pages' | 'search' | 'get_backlinks',
               success: Boolean(out?.success),
               path: typeof out?.path === 'string' ? out.path : undefined,
-              content:
-                typeof out?.content === 'string'
-                  ? out.content
-                  : Array.isArray(out?.paths)
-                    ? (out.paths as string[]).join('\n')
-                    : undefined,
+              content: this.summarizeToolOutput(part.toolName, out),
               count: typeof out?.count === 'number' ? out.count : undefined,
               error: typeof out?.error === 'string' ? out.error : undefined,
             });
@@ -183,6 +181,42 @@ class AIOrchestratorClass {
     }
 
     return result;
+  }
+
+  /**
+   * Render a read-tool's structured output as a short text blob for the chat card.
+   * The model itself receives the full JSON via the SDK's tool-result message;
+   * this is purely for the renderer's ToolResultCard preview.
+   */
+  private summarizeToolOutput(
+    toolName: string,
+    out: Record<string, unknown> | undefined,
+  ): string | undefined {
+    if (!out) return undefined;
+    if (typeof out.content === 'string') return out.content;
+    if (Array.isArray(out.paths)) return (out.paths as string[]).join('\n');
+    if (toolName === 'search' && Array.isArray(out.results)) {
+      const items = out.results as Array<{
+        path: string;
+        title?: string;
+        snippet?: string;
+      }>;
+      return items
+        .map((r) => `· ${r.title ? `${r.title} (${r.path})` : r.path}${r.snippet ? `\n  ${r.snippet.slice(0, 120)}` : ''}`)
+        .join('\n');
+    }
+    if (toolName === 'get_backlinks' && Array.isArray(out.backlinks)) {
+      const items = out.backlinks as Array<{
+        fromPath: string;
+        fromTitle?: string;
+        anchor?: string | null;
+      }>;
+      if (items.length === 0) return '(nenhum backlink)';
+      return items
+        .map((b) => `· ${b.fromTitle ? `${b.fromTitle} (${b.fromPath})` : b.fromPath}${b.anchor ? ` ← "${b.anchor}"` : ''}`)
+        .join('\n');
+    }
+    return undefined;
   }
 
   /**

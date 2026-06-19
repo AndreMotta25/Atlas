@@ -417,20 +417,22 @@ export const EditorPane: React.FC<EditorPaneProps> = ({ onCommentsChange, onComm
     <div className="flex flex-col h-full overflow-hidden">
       <div className="px-4 py-1.5 border-b border-border flex items-center justify-between text-xs text-muted-foreground">
         <div className="flex items-center gap-1 min-w-0 flex-1">
+          <span className="truncate ml-2">{currentPath ?? 'Nenhuma página selecionada'}</span>
+        </div>
+        <div className="flex items-center gap-1 shrink-0">
           <button
             onClick={() => onSetTab('comments')}
-            className={`text-xs px-2.5 py-1 rounded transition-colors shrink-0 ${
+            className={`p-1 rounded transition-colors shrink-0 ${
               chatTab === 'comments'
                 ? 'bg-primary text-primary-foreground'
                 : 'text-muted-foreground hover:text-foreground hover:bg-accent'
             }`}
-            title="Comentários"
+            title={`Comentários${commentCount > 0 ? ` (${commentCount})` : ''}`}
           >
-            📝 Comentários{commentCount > 0 ? ` (${commentCount})` : ''}
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5 shrink-0">
+              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+            </svg>
           </button>
-          <span className="truncate ml-2">{currentPath ?? 'Nenhuma página selecionada'}</span>
-        </div>
-        <div className="flex items-center gap-2 shrink-0">
           <button
             onClick={formatDocument}
             title="Formatar Markdown"

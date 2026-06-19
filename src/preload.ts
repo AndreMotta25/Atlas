@@ -3,10 +3,13 @@ import { createChannel } from './types';
 import type {
   AIProvider,
   AppSettings,
+  BacklinkResult,
+  ChatMessage,
   ChatRequestOptions,
   ChatStreamChunk,
   PageContent,
   PendingToolCall,
+  SearchResult,
   ToolConfirmRequest,
   ToolRejectRequest,
   ToolResultPayload,
@@ -75,6 +78,10 @@ const electronAPI = {
       ipcRenderer.on(channel, wrapped);
       return () => ipcRenderer.removeListener(channel, wrapped);
     },
+    search: (query: string, limit?: number): Promise<SearchResult[]> =>
+      ipcRenderer.invoke(createChannel('vault', 'search'), query, limit),
+    backlinks: (targetPath: string): Promise<BacklinkResult[]> =>
+      ipcRenderer.invoke(createChannel('vault', 'backlinks'), targetPath),
   },
 
   // ── Settings ──
@@ -98,6 +105,10 @@ const electronAPI = {
       ipcRenderer.invoke(createChannel('ai', 'chat'), opts),
     cancel: (requestId: string): Promise<{ success: boolean }> =>
       ipcRenderer.invoke(createChannel('ai', 'cancel'), requestId),
+    compact: (messages: ChatMessage[]): Promise<{ success: boolean; summary?: string; error?: string }> =>
+      ipcRenderer.invoke(createChannel('ai', 'compact'), messages),
+    search: (query: string, pagePaths: string[]): Promise<{ success: boolean; results?: Array<{ path: string; reason: string }>; error?: string }> =>
+      ipcRenderer.invoke(createChannel('ai', 'search'), query, pagePaths),
     onToken: (listener: Listener<ChatStreamChunk>): Unsubscribe => {
       const channel = createChannel('ai', 'token');
       const wrapped = (_e: unknown, payload: ChatStreamChunk) => listener(payload);
