@@ -2,7 +2,7 @@ import Database from 'better-sqlite3';
 import type { Database as DB } from 'better-sqlite3';
 import { app } from 'electron';
 import * as path from 'path';
-import type { BacklinkResult, SearchResult } from '../types';
+import type { BacklinkResult, ChatMessage, ChatSearchResult, ChatSession, SearchResult } from '../types';
 
 /**
  * SQLite layer for the Atlas vault index.
@@ -71,10 +71,42 @@ class DatabaseServiceClass {
         content,
         tokenize = "unicode61 remove_diacritics 2 categories 'L* N* Co'"
       );
+
+      CREATE TABLE IF NOT EXISTS chat_sessions (
+        id         TEXT PRIMARY KEY,
+        title      TEXT,
+        page_path  TEXT,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_chat_sessions_page    ON chat_sessions(page_path);
+      CREATE INDEX IF NOT EXISTS idx_chat_sessions_updated ON chat_sessions(updated_at DESC);
+
+      CREATE TABLE IF NOT EXISTS chat_messages (
+        id                 TEXT PRIMARY KEY,
+        session_id         TEXT NOT NULL REFERENCES chat_sessions(id) ON DELETE CASCADE,
+        role               TEXT NOT NULL,
+        content            TEXT NOT NULL,
+        tool_calls_json    TEXT,
+        tool_results_json  TEXT,
+        seq                INTEGER NOT NULL,
+        created_at         INTEGER NOT NULL,
+        UNIQUE(session_id, seq)
+      );
+      CREATE INDEX IF NOT EXISTS idx_chat_messages_session ON chat_messages(session_id, seq);
+
+      CREATE VIRTUAL TABLE IF NOT EXISTS chat_messages_fts USING fts5(
+        content,
+        message_id UNINDEXED,
+        tokenize = "unicode61 remove_diacritics 2 categories 'L* N* Co'"
+      );
     `);
 
     if (current < 1) {
       this.db.pragma('user_version = 1');
+    }
+    if (current < 2) {
+      this.db.pragma('user_version = 2');
     }
   }
 
@@ -238,6 +270,215 @@ class DatabaseServiceClass {
     }));
   }
 
+  // ── Chat sessions / messages ──────────────────────────────────
+
+  /** Insert a new chat session. Title is typically null until the first user message. */
+  createSession(opts: { id: string; title: string | null; pagePath: string | null }): void {
+    const db = this.requireOpen();
+    const now = Date.now();
+    db.prepare(
+      'INSERT INTO chat_sessions (id, title, page_path, created_at, updated_at) VALUES (?, ?, ?, ?, ?)',
+    ).run(opts.id, opts.title, opts.pagePath, now, now);
+  }
+
+  /** Update a session's title (e.g. from the first user message). */
+  updateSessionTitle(sessionId: string, title: string): void {
+    const db = this.requireOpen();
+    db.prepare(
+      'UPDATE chat_sessions SET title = ?, updated_at = ? WHERE id = ?',
+    ).run(title.slice(0, 120), Date.now(), sessionId);
+  }
+
+  /** Bump updated_at — call when a message is appended/updated. */
+  touchSession(sessionId: string): void {
+    const db = this.requireOpen();
+    db.prepare('UPDATE chat_sessions SET updated_at = ? WHERE id = ?').run(
+      Date.now(),
+      sessionId,
+    );
+  }
+
+  /** Delete a session and cascade-clean its messages (and FTS rows). */
+  deleteSession(sessionId: string): void {
+    const db = this.requireOpen();
+    const tx = db.transaction(() => {
+      const ids = db.prepare(
+        'SELECT id FROM chat_messages WHERE session_id = ?',
+      ).all(sessionId) as Array<{ id: string }>;
+      const delFts = db.prepare('DELETE FROM chat_messages_fts WHERE message_id = ?');
+      for (const r of ids) delFts.run(r.id);
+      // chat_messages rows removed by FK cascade when session is deleted.
+      db.prepare('DELETE FROM chat_sessions WHERE id = ?').run(sessionId);
+    });
+    tx();
+  }
+
+  /** List sessions, optionally filtered by page_path. Most recent first. */
+  listSessions(opts: {
+    pagePath?: string | null;
+    includeGlobal?: boolean;
+    limit?: number;
+  } = {}): ChatSession[] {
+    const db = this.requireOpen();
+    const limit = opts.limit ?? 50;
+    const conds: string[] = [];
+    const params: unknown[] = [];
+
+    if (opts.pagePath !== undefined) {
+      conds.push('(page_path = ? OR page_path IS NULL)');
+      params.push(opts.pagePath);
+    } else if (opts.includeGlobal === false) {
+      conds.push('page_path IS NOT NULL');
+    }
+
+    const where = conds.length ? `WHERE ${conds.join(' AND ')}` : '';
+    const rows = db.prepare(
+      `SELECT id, title, page_path AS pagePath, created_at AS createdAt, updated_at AS updatedAt,
+        (SELECT COUNT(*) FROM chat_messages WHERE session_id = chat_sessions.id) AS messageCount
+       FROM chat_sessions ${where}
+       ORDER BY updated_at DESC
+       LIMIT ?`,
+    ).all(...params, limit) as Array<{
+      id: string;
+      title: string | null;
+      pagePath: string | null;
+      createdAt: number;
+      updatedAt: number;
+      messageCount: number;
+    }>;
+
+    return rows.map((r) => ({
+      id: r.id,
+      title: r.title,
+      pagePath: r.pagePath,
+      createdAt: r.createdAt,
+      updatedAt: r.updatedAt,
+      messageCount: r.messageCount,
+    }));
+  }
+
+  /** Return a single session row, or null if not found. */
+  getSession(id: string): ChatSession | null {
+    const db = this.requireOpen();
+    const row = db.prepare(
+      `SELECT id, title, page_path AS pagePath, created_at AS createdAt, updated_at AS updatedAt,
+        (SELECT COUNT(*) FROM chat_messages WHERE session_id = chat_sessions.id) AS messageCount
+       FROM chat_sessions WHERE id = ?`,
+    ).get(id) as ChatSession | undefined;
+    return row ?? null;
+  }
+
+  /** Upsert a message into chat_messages + keep FTS in sync (standalone FTS pattern). */
+  upsertMessage(sessionId: string, msg: ChatMessage, seq: number): void {
+    const db = this.requireOpen();
+    const now = Date.now();
+    const toolCallsJson = msg.toolCalls ? JSON.stringify(msg.toolCalls) : null;
+    const toolResultsJson = msg.toolResults ? JSON.stringify(msg.toolResults) : null;
+
+    const tx = db.transaction(() => {
+      const existing = db.prepare(
+        'SELECT id FROM chat_messages WHERE id = ?',
+      ).get(msg.id) as { id: string } | undefined;
+
+      if (existing) {
+        db.prepare('DELETE FROM chat_messages_fts WHERE message_id = ?').run(msg.id);
+        db.prepare(
+          `UPDATE chat_messages SET role = ?, content = ?, tool_calls_json = ?, tool_results_json = ?, seq = ?, created_at = ? WHERE id = ?`,
+        ).run(msg.role, msg.content, toolCallsJson, toolResultsJson, seq, now, msg.id);
+      } else {
+        db.prepare(
+          `INSERT INTO chat_messages (id, session_id, role, content, tool_calls_json, tool_results_json, seq, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        ).run(msg.id, sessionId, msg.role, msg.content, toolCallsJson, toolResultsJson, seq, now);
+      }
+      // Insert fresh FTS row reflecting current content.
+      db.prepare('INSERT INTO chat_messages_fts (content, message_id) VALUES (?, ?)').run(
+        msg.content,
+        msg.id,
+      );
+      // Touch the parent session so it bubbles to the top of recents.
+      db.prepare('UPDATE chat_sessions SET updated_at = ? WHERE id = ?').run(now, sessionId);
+    });
+    tx();
+  }
+
+  /** Delete a single message + its FTS row. */
+  deleteMessage(messageId: string): void {
+    const db = this.requireOpen();
+    const tx = db.transaction(() => {
+      db.prepare('DELETE FROM chat_messages_fts WHERE message_id = ?').run(messageId);
+      db.prepare('DELETE FROM chat_messages WHERE id = ?').run(messageId);
+    });
+    tx();
+  }
+
+  /** Load all messages of a session, ordered by seq. Re-hydrates toolCalls/toolResults JSON. */
+  listMessages(sessionId: string): ChatMessage[] {
+    const db = this.requireOpen();
+    const rows = db.prepare(
+      `SELECT id, role, content, tool_calls_json AS toolCallsJson, tool_results_json AS toolResultsJson
+       FROM chat_messages WHERE session_id = ? ORDER BY seq ASC`,
+    ).all(sessionId) as Array<{
+      id: string;
+      role: 'user' | 'assistant' | 'system';
+      content: string;
+      toolCallsJson: string | null;
+      toolResultsJson: string | null;
+    }>;
+    return rows.map((r) => ({
+      id: r.id,
+      role: r.role,
+      content: r.content,
+      toolCalls: r.toolCallsJson ? safeParse(r.toolCallsJson) : undefined,
+      toolResults: r.toolResultsJson ? safeParse(r.toolResultsJson) : undefined,
+    }));
+  }
+
+  /** FTS5 search over chat messages, joined with their parent session. */
+  searchMessages(query: string, limit = 20): ChatSearchResult[] {
+    const db = this.requireOpen();
+    const trimmed = query.trim();
+    if (!trimmed) return [];
+    const sanitized = trimmed.replace(/"/g, '""');
+    try {
+      const rows = db.prepare(`
+        SELECT
+          f.message_id       AS messageId,
+          m.session_id       AS sessionId,
+          m.role             AS role,
+          substring(coalesce(m.content, ''), 1, 200) AS snippet,
+          bm25(chat_messages_fts) AS rank,
+          s.title            AS sessionTitle,
+          s.page_path        AS pagePath
+        FROM chat_messages_fts f
+        JOIN chat_messages m ON m.id = f.message_id
+        JOIN chat_sessions s ON s.id = m.session_id
+        WHERE chat_messages_fts MATCH ?
+        ORDER BY rank
+        LIMIT ?
+      `).all(sanitized, limit) as Array<{
+        messageId: string;
+        sessionId: string;
+        role: 'user' | 'assistant' | 'system';
+        snippet: string;
+        rank: number;
+        sessionTitle: string | null;
+        pagePath: string | null;
+      }>;
+      return rows.map((r) => ({
+        sessionId: r.sessionId,
+        sessionTitle: r.sessionTitle,
+        pagePath: r.pagePath,
+        messageId: r.messageId,
+        role: r.role,
+        snippet: r.snippet.replace(/\s+/g, ' ').trim(),
+        rank: r.rank,
+      }));
+    } catch {
+      return [];
+    }
+  }
+
   /** Throws if the DB hasn't been opened. Use inside methods that use `db` in closures. */
   private requireOpen(): DB {
     if (!this.db) throw new Error('DB not open');
@@ -246,3 +487,12 @@ class DatabaseServiceClass {
 }
 
 export const DatabaseService = new DatabaseServiceClass();
+
+/** Best-effort JSON.parse — returns the parsed value or undefined on failure. */
+function safeParse<T>(raw: string): T | undefined {
+  try {
+    return JSON.parse(raw) as T;
+  } catch {
+    return undefined;
+  }
+}

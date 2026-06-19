@@ -2,12 +2,16 @@ import { create } from 'zustand';
 import { api } from '../lib/api';
 import type {
   ChatMessage,
+  ChatSession,
   ChatStreamChunk,
   PendingToolCall,
   ToolResultPayload,
 } from '../types';
 
 const newId = () => Math.random().toString(36).slice(2, 10);
+
+/** Best-effort swallower for promise rejections we don't want to surface. */
+const noop = (): void => { /* intentional */ };
 
 const WRITE_TOOLS = new Set(['create_page', 'edit_page']);
 
@@ -21,6 +25,10 @@ interface ChatState {
   contextPages: string[];
   /** Text snippets sent to Atlas context via editor selection. */
   contextSnippets: string[];
+  /** Currently active session — null until first message is sent. */
+  activeSession: ChatSession | null;
+  /** Recent sessions cache for the dropdown. */
+  sessions: ChatSession[];
 
   init: () => () => void;
   send: (text: string) => Promise<void>;
@@ -41,6 +49,16 @@ interface ChatState {
   undoLast: () => Promise<void>;
   /** Compact the conversation — replaces all messages with an AI-generated summary. */
   compactConversation: () => Promise<void>;
+
+  // Session management
+  /** Refresh the recent-sessions cache from disk. */
+  refreshSessions: () => Promise<void>;
+  /** Create and activate a fresh empty session. */
+  newConversation: () => Promise<void>;
+  /** Load an existing session by id. */
+  loadConversation: (id: string) => Promise<void>;
+  /** Delete a session from disk. If it's the active one, clears state. */
+  deleteConversation: (id: string) => Promise<void>;
 }
 
 export const useChatStore = create<ChatState>((set, get) => ({
@@ -51,8 +69,19 @@ export const useChatStore = create<ChatState>((set, get) => ({
   unsubscribe: null,
   contextPages: [],
   contextSnippets: [],
+  activeSession: null,
+  sessions: [],
 
   init: () => {
+    // Load recent sessions + restore the most recent global one.
+    void get().refreshSessions().then(() => {
+      const { sessions, activeSession } = get();
+      if (activeSession) return;
+      const mostRecent = sessions[0];
+      if (!mostRecent) return;
+      void get().loadConversation(mostRecent.id);
+    });
+
     const offToken = api.ai.onToken((chunk: ChatStreamChunk) => {
       const state = get();
       if (chunk.requestId !== state.activeRequestId) return;
@@ -71,6 +100,16 @@ export const useChatStore = create<ChatState>((set, get) => ({
       }
 
       if (chunk.done) {
+        // Persist the final assistant message now that the stream closed.
+        const after = get();
+        const assistantMsg = after.messages.find((m) => m.id === chunk.requestId);
+        if (assistantMsg && after.activeSession) {
+          const seq = after.messages.findIndex((m) => m.id === chunk.requestId);
+          void api.chat.saveMessage(after.activeSession.id, assistantMsg, seq).catch(() => {
+            /* persistence is best-effort */
+          });
+          void get().refreshSessions();
+        }
         set({ streaming: false, activeRequestId: null });
       }
     });
@@ -116,6 +155,19 @@ export const useChatStore = create<ChatState>((set, get) => ({
           };
         }),
       }));
+
+      // For write tools, the assistant message is finalized after the result is
+      // attached — persist the updated version so it survives reload.
+      if (WRITE_TOOLS.has(result.toolName)) {
+        const after = get();
+        if (after.activeSession && after.activeRequestId) {
+          const assistantMsg = after.messages.find((m) => m.id === after.activeRequestId);
+          if (assistantMsg) {
+            const seq = after.messages.findIndex((m) => m.id === after.activeRequestId);
+            void api.chat.saveMessage(after.activeSession.id, assistantMsg, seq).catch(noop);
+          }
+        }
+      }
     });
 
     const unsubscribe = () => {
@@ -142,6 +194,27 @@ export const useChatStore = create<ChatState>((set, get) => ({
     const userMsg: ChatMessage = { id: newId(), role: 'user', content: text };
     const assistantId = newId();
     const assistantMsg: ChatMessage = { id: assistantId, role: 'assistant', content: '' };
+
+    // Persist: ensure we have a session. Auto-create on first message.
+    let session = get().activeSession;
+    try {
+      if (!session) {
+        session = await api.chat.createSession({ pagePath: null, title: null });
+        set({ activeSession: session });
+      }
+      const seq = get().messages.length;
+      await api.chat.saveMessage(session.id, userMsg, seq);
+      // Auto-title from first user message.
+      if (session.title === null) {
+        const title = text.slice(0, 60).replace(/\s+/g, ' ').trim() || 'Sem título';
+        await api.chat.renameSession(session.id, title);
+        set({
+          activeSession: { ...session, title },
+        });
+      }
+    } catch {
+      // persistence is best-effort — chat still works in-memory
+    }
 
     set((s) => ({
       messages: [...s.messages, userMsg, assistantMsg],
@@ -189,7 +262,16 @@ export const useChatStore = create<ChatState>((set, get) => ({
   reset: () => {
     const { unsubscribe } = get();
     if (unsubscribe) unsubscribe();
-    set({ messages: [], streaming: false, activeRequestId: null, error: null, unsubscribe: null, contextPages: [], contextSnippets: [] });
+    set({
+      messages: [],
+      streaming: false,
+      activeRequestId: null,
+      error: null,
+      unsubscribe: null,
+      contextPages: [],
+      contextSnippets: [],
+      activeSession: null,
+    });
   },
 
   loadPageContext: (path) =>
@@ -278,18 +360,45 @@ export const useChatStore = create<ChatState>((set, get) => ({
     try {
       const result = await api.ai.compact(state.messages);
       if (result.success && result.summary) {
+        // Mark the previous session as "(compactada)" so the original
+        // conversation stays accessible in history, and start a fresh
+        // session with the summary as the first message.
+        const oldSession = get().activeSession;
+        if (oldSession) {
+          try {
+            await api.chat.renameSession(
+              oldSession.id,
+              `${oldSession.title ?? 'Conversa'} (compactada)`,
+            );
+          } catch {
+            /* best-effort */
+          }
+        }
+
+        const newSession = await api.chat.createSession({
+          pagePath: null,
+          title: 'Conversa compactada',
+        });
+        const summaryContent = `📋 **Conversa compactada**\n\n${result.summary}\n\n---\n*Esta é uma versão resumida da conversa anterior. Você pode continuar fazendo perguntas.*`;
+        const summaryMsg: ChatMessage = {
+          id: newId(),
+          role: 'assistant',
+          content: summaryContent,
+        };
+        try {
+          await api.chat.saveMessage(newSession.id, summaryMsg, 0);
+        } catch {
+          /* best-effort */
+        }
+
         set({
-          messages: [
-            {
-              id: newId(),
-              role: 'assistant',
-              content: `📋 **Conversa compactada**\n\n${result.summary}\n\n---\n*Esta é uma versão resumida da conversa anterior. Você pode continuar fazendo perguntas.*`,
-            },
-          ],
+          messages: [summaryMsg],
           streaming: false,
           activeRequestId: null,
           error: null,
+          activeSession: newSession,
         });
+        void get().refreshSessions();
       } else {
         set({
           streaming: false,
@@ -303,6 +412,56 @@ export const useChatStore = create<ChatState>((set, get) => ({
         activeRequestId: null,
         error: err instanceof Error ? err.message : String(err),
       });
+    }
+  },
+
+  refreshSessions: async () => {
+    try {
+      const sessions = await api.chat.listSessions({ includeGlobal: true, limit: 50 });
+      set({ sessions });
+    } catch {
+      /* best-effort */
+    }
+  },
+
+  newConversation: async () => {
+    if (get().streaming) return;
+    const session = await api.chat.createSession({ pagePath: null, title: null });
+    set({
+      activeSession: session,
+      messages: [],
+      error: null,
+      activeRequestId: null,
+    });
+    void get().refreshSessions();
+  },
+
+  loadConversation: async (id) => {
+    if (get().streaming) return;
+    try {
+      const loaded = await api.chat.loadSession(id);
+      if (!loaded) return;
+      set({
+        activeSession: loaded.session,
+        messages: loaded.messages,
+        error: null,
+        activeRequestId: null,
+      });
+    } catch (err) {
+      set({ error: err instanceof Error ? err.message : String(err) });
+    }
+  },
+
+  deleteConversation: async (id) => {
+    try {
+      await api.chat.deleteSession(id);
+      const { activeSession } = get();
+      if (activeSession?.id === id) {
+        set({ activeSession: null, messages: [] });
+      }
+      void get().refreshSessions();
+    } catch (err) {
+      set({ error: err instanceof Error ? err.message : String(err) });
     }
   },
 }));

@@ -6,6 +6,8 @@ import type {
   BacklinkResult,
   ChatMessage,
   ChatRequestOptions,
+  ChatSearchResult,
+  ChatSession,
   ChatStreamChunk,
   PageContent,
   PendingToolCall,
@@ -82,6 +84,31 @@ const electronAPI = {
       ipcRenderer.invoke(createChannel('vault', 'search'), query, limit),
     backlinks: (targetPath: string): Promise<BacklinkResult[]> =>
       ipcRenderer.invoke(createChannel('vault', 'backlinks'), targetPath),
+  },
+
+  // ── Chat sessions (persistence) ──
+  chat: {
+    createSession: (opts?: {
+      pagePath?: string | null;
+      title?: string | null;
+    }): Promise<ChatSession> =>
+      ipcRenderer.invoke(createChannel('chat', 'create-session'), opts),
+    listSessions: (opts?: {
+      pagePath?: string | null;
+      includeGlobal?: boolean;
+      limit?: number;
+    }): Promise<ChatSession[]> =>
+      ipcRenderer.invoke(createChannel('chat', 'list-sessions'), opts),
+    loadSession: (id: string): Promise<{ session: ChatSession; messages: ChatMessage[] } | null> =>
+      ipcRenderer.invoke(createChannel('chat', 'load-session'), id),
+    deleteSession: (id: string): Promise<{ success: boolean }> =>
+      ipcRenderer.invoke(createChannel('chat', 'delete-session'), id),
+    renameSession: (id: string, title: string): Promise<{ success: boolean }> =>
+      ipcRenderer.invoke(createChannel('chat', 'rename-session'), id, title),
+    saveMessage: (sessionId: string, message: ChatMessage, seq: number): Promise<{ success: boolean }> =>
+      ipcRenderer.invoke(createChannel('chat', 'save-message'), sessionId, message, seq),
+    searchMessages: (query: string, limit?: number): Promise<ChatSearchResult[]> =>
+      ipcRenderer.invoke(createChannel('chat', 'search-messages'), query, limit),
   },
 
   // ── Settings ──

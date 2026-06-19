@@ -2,7 +2,7 @@
 
 > Acompanhamento de progresso. Especificação completa em `spec.md` e `architecture.md`.
 
-Última atualização: **2026-06-19**
+Última atualização: **2026-06-19** (revisão: persistência de chat)
 
 ---
 
@@ -81,6 +81,23 @@ Próxima etapa prevista: **Fase 3 — Rico** (wiki-links clicáveis, painel de b
 | **Tools IA** `search` e `get_backlinks` (auto-exec, read-only) | ✅ | `ai/tools.ts`, `orchestrator.ts` |
 | DB abre no `app.whenReady` e fecha no `before-quit` | ✅ | `src/index.ts` |
 | IPC type-safe: `vault:search`, `vault:backlinks` | ✅ | `search_handlers.ts`, `preload.ts` |
+
+### Extra — Persistência de Conversas do Atlas — ✅ Concluída
+
+| Área | Implementado | Arquivos |
+|---|---|---|
+| **Schema SQLite v2** — `chat_sessions`, `chat_messages`, `chat_messages_fts` (FTS5 com `message_id UNINDEXED`) | ✅ | `src/vault/db.ts` (migration `user_version=2`) |
+| **Métodos DB** — `createSession`, `updateSessionTitle`, `touchSession`, `deleteSession`, `listSessions`, `getSession`, `upsertMessage`, `deleteMessage`, `listMessages`, `searchMessages` | ✅ | `src/vault/db.ts` |
+| Sync FTS standalone (delete-then-insert por `message_id`) | ✅ | `src/vault/db.ts` |
+| **IPC handlers** `chat:create-session`, `list-sessions`, `load-session`, `delete-session`, `rename-session`, `save-message`, `search-messages` | ✅ | `src/ipc/chat_handlers.ts` (novo), `src/ipc/index.ts` |
+| **Preload** — namespace `chat:` no `electronAPI` | ✅ | `src/preload.ts` |
+| **chat_store** — `activeSession`, `sessions`, auto-cria sessão no 1º send, persiste user msg + assistant no `done` + assistant com toolResults, `refreshSessions`, `newConversation`, `loadConversation`, `deleteConversation` | ✅ | `src/stores/chat_store.ts` |
+| **UI dropdown de sessões** no header do ChatPanel (fora-click, tempo relativo, "+ nova") | ✅ | `src/components/chat/chat_panel.tsx` |
+| **Compactação preserva sessão original** (renomeia p/ "...(compactada)") e cria nova com o summary | ✅ | `chat_store.ts` |
+| **Busca da sidebar mescla páginas + conversas** (FTS5 paralelo em `chat_messages_fts`) | ✅ | `src/components/app_shell.tsx` |
+| IPC type-safe: `chat:*` | ✅ | `chat_handlers.ts`, `preload.ts` |
+
+> **Modelo híbrido**: o schema suporta sessões globais (page_path NULL) ou vinculadas a uma página. A UI atual cria apenas sessões globais — a vinculação por página fica para a Fase 3 (precisa de UX: toggle, sempre, ou por ação explícita).
 
 ---
 

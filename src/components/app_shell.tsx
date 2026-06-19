@@ -7,6 +7,7 @@ import { useVaultStore } from '../stores/vault_store';
 import { useChatStore } from '../stores/chat_store';
 import { useTheme } from '../hooks/use_theme';
 import { api } from '../lib/api';
+import type { ChatSearchResult } from '../types';
 
 export interface CommentEntry {
   pos: number;
@@ -52,7 +53,8 @@ export const AppShell: React.FC = () => {
   // Search state
   const [searchQuery, setSearchQuery] = useState('');
   const [searching, setSearching] = useState(false);
-  const [searchResults, setSearchResults] = useState<Array<{ path: string; reason: string }> | null>(null);
+  const [pageResults, setPageResults] = useState<Array<{ path: string; reason: string }> | null>(null);
+  const [chatResults, setChatResults] = useState<ChatSearchResult[] | null>(null);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
 
   useTheme();
@@ -155,23 +157,45 @@ export const AppShell: React.FC = () => {
     const q = searchQuery.trim();
     if (!q || searching) return;
     setSearching(true);
-    setSearchResults(null);
+    setPageResults(null);
+    setChatResults(null);
     try {
-      // FTS5 content search — instant and free (no LLM round-trip).
-      const results = await api.vault.search(q);
-      setSearchResults(results.map((r) => ({ path: r.path, reason: r.snippet })));
+      // Run both FTS5 searches in parallel — pages + chat messages.
+      const [pages, messages] = await Promise.all([
+        api.vault.search(q).catch((): Awaited<ReturnType<typeof api.vault.search>> => []),
+        api.chat.searchMessages(q).catch((): Awaited<ReturnType<typeof api.chat.searchMessages>> => []),
+      ]);
+      setPageResults(pages.map((r) => ({ path: r.path, reason: r.snippet })));
+      setChatResults(messages);
     } catch {
-      setSearchResults([]);
+      setPageResults([]);
+      setChatResults([]);
     } finally {
       setSearching(false);
     }
   };
 
   const handleOpenSearchResult = async (path: string) => {
-    setSearchQuery('');
-    setSearchResults(null);
+    clearSearch();
     await openPage(path);
   };
+
+  const handleOpenChatResult = async (sessionId: string) => {
+    clearSearch();
+    setChatTab('chat');
+    await useChatStore.getState().loadConversation(sessionId);
+  };
+
+  const clearSearch = () => {
+    setSearchQuery('');
+    setPageResults(null);
+    setChatResults(null);
+  };
+
+  const hasResults =
+    (pageResults !== null && pageResults.length > 0) ||
+    (chatResults !== null && chatResults.length > 0);
+  const showingResults = pageResults !== null || chatResults !== null;
 
   return (
     <div className="flex h-screen bg-background text-foreground overflow-hidden">
@@ -247,18 +271,18 @@ export const AppShell: React.FC = () => {
               value={searchQuery}
               onChange={(e) => {
                 setSearchQuery(e.target.value);
-                if (!e.target.value.trim()) setSearchResults(null);
+                if (!e.target.value.trim()) {
+                  setPageResults(null);
+                  setChatResults(null);
+                }
               }}
               onKeyDown={(e) => {
                 if (e.key === 'Enter') void handleSearch();
-                if (e.key === 'Escape') {
-                  setSearchQuery('');
-                  setSearchResults(null);
-                }
+                if (e.key === 'Escape') clearSearch();
               }}
               onFocus={() => {
                 // Re-run search if results are empty and query exists
-                if (searchQuery.trim() && searchResults?.length === 0) void handleSearch();
+                if (searchQuery.trim() && !hasResults) void handleSearch();
               }}
               placeholder="Pesquisar no vault…"
               className="w-full text-xs pl-7 pr-2 py-1.5 border border-input bg-card text-foreground rounded focus:outline-none focus:border-primary transition-colors"
@@ -277,7 +301,7 @@ export const AppShell: React.FC = () => {
             )}
             {searchQuery && !searching && (
               <button
-                onClick={() => { setSearchQuery(''); setSearchResults(null); }}
+                onClick={clearSearch}
                 className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 text-muted-foreground hover:text-foreground transition-colors"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-3 h-3">
@@ -290,9 +314,9 @@ export const AppShell: React.FC = () => {
         </div>
 
         {/* Search results or file tree */}
-        {searchResults !== null ? (
+        {showingResults ? (
           <div className="flex-1 overflow-auto">
-            {searchResults.length === 0 ? (
+            {!hasResults ? (
               <div className="px-3 py-6 text-center">
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="w-8 h-8 mx-auto text-muted-foreground/40 mb-2">
                   <circle cx="11" cy="11" r="8" />
@@ -301,41 +325,84 @@ export const AppShell: React.FC = () => {
                 <p className="text-xs text-muted-foreground">Nenhum resultado encontrado.</p>
               </div>
             ) : (
-              <div>
+              <>
                 <div className="px-3 py-1.5 border-b border-border bg-muted/30 flex items-center justify-between">
                   <span className="text-[10px] uppercase tracking-wide text-muted-foreground font-medium">
-                    Resultados ({searchResults.length})
+                    Resultados
                   </span>
                   <button
-                    onClick={() => setSearchResults(null)}
+                    onClick={clearSearch}
                     className="text-[10px] text-muted-foreground hover:text-foreground transition-colors"
                   >
                     Voltar
                   </button>
                 </div>
-                {searchResults.map((r, i) => (
-                  <button
-                    key={i}
-                    onClick={() => void handleOpenSearchResult(r.path)}
-                    className="w-full text-left px-3 py-2 hover:bg-accent border-b border-border/50 transition-colors group"
-                  >
-                    <div className="flex items-start gap-2">
-                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5 text-primary shrink-0 mt-0.5">
-                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                        <polyline points="14 2 14 8 20 8" />
-                      </svg>
-                      <div className="min-w-0">
-                        <span className="text-xs font-medium text-foreground block truncate group-hover:text-primary transition-colors">
-                          {r.path}
-                        </span>
-                        <span className="text-[10px] text-muted-foreground block mt-0.5 line-clamp-2">
-                          {r.reason}
-                        </span>
-                      </div>
+
+                {/* Pages section */}
+                {pageResults && pageResults.length > 0 && (
+                  <div>
+                    <div className="px-3 py-1 bg-muted/20 border-b border-border/50">
+                      <span className="text-[10px] uppercase tracking-wide text-muted-foreground font-medium">
+                        Páginas ({pageResults.length})
+                      </span>
                     </div>
-                  </button>
-                ))}
-              </div>
+                    {pageResults.map((r, i) => (
+                      <button
+                        key={`p${i}`}
+                        onClick={() => void handleOpenSearchResult(r.path)}
+                        className="w-full text-left px-3 py-2 hover:bg-accent border-b border-border/50 transition-colors group"
+                      >
+                        <div className="flex items-start gap-2">
+                          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5 text-primary shrink-0 mt-0.5">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                            <polyline points="14 2 14 8 20 8" />
+                          </svg>
+                          <div className="min-w-0">
+                            <span className="text-xs font-medium text-foreground block truncate group-hover:text-primary transition-colors">
+                              {r.path}
+                            </span>
+                            <span className="text-[10px] text-muted-foreground block mt-0.5 line-clamp-2">
+                              {r.reason}
+                            </span>
+                          </div>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {/* Chat messages section */}
+                {chatResults && chatResults.length > 0 && (
+                  <div>
+                    <div className="px-3 py-1 bg-muted/20 border-b border-border/50">
+                      <span className="text-[10px] uppercase tracking-wide text-muted-foreground font-medium">
+                        Conversas ({chatResults.length})
+                      </span>
+                    </div>
+                    {chatResults.map((r, i) => (
+                      <button
+                        key={`c${i}`}
+                        onClick={() => void handleOpenChatResult(r.sessionId)}
+                        className="w-full text-left px-3 py-2 hover:bg-accent border-b border-border/50 transition-colors group"
+                      >
+                        <div className="flex items-start gap-2">
+                          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5 text-primary shrink-0 mt-0.5">
+                            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                          </svg>
+                          <div className="min-w-0">
+                            <span className="text-xs font-medium text-foreground block truncate group-hover:text-primary transition-colors italic">
+                              {r.sessionTitle ?? 'Sem título'}
+                            </span>
+                            <span className="text-[10px] text-muted-foreground block mt-0.5 line-clamp-2">
+                              {r.snippet}
+                            </span>
+                          </div>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </>
             )}
           </div>
         ) : (

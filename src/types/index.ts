@@ -208,3 +208,27 @@ export interface BacklinkResult {
   /** The anchor/alias used in the link, if any. */
   anchor: string | null;
 }
+
+// ─── Chat Session Types ────────────────────────────────────────
+export interface ChatSession {
+  id: string;
+  title: string | null;
+  /** Page path the session is bound to (NULL = global). */
+  pagePath: string | null;
+  createdAt: number;
+  updatedAt: number;
+  /** Filled when listing; undefined when only the row is needed. */
+  messageCount?: number;
+}
+
+export interface ChatSearchResult {
+  sessionId: string;
+  sessionTitle: string | null;
+  pagePath: string | null;
+  messageId: string;
+  role: 'user' | 'assistant' | 'system';
+  /** FTS5 snippet of the matched message content. */
+  snippet: string;
+  /** BM25 rank (lower = more relevant). */
+  rank: number;
+}

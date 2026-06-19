@@ -10,6 +10,7 @@ import { registerSettingsHandlers } from './settings_handlers';
 import { registerAIHandlers } from './ai_handlers';
 import { registerToolHandlers } from './tool_handlers';
 import { registerSearchHandlers } from './search_handlers';
+import { registerChatHandlers } from './chat_handlers';
 
 export const registerAllHandlers = (): void => {
   registerFileHandlers();
@@ -24,4 +25,5 @@ export const registerAllHandlers = (): void => {
   registerAIHandlers();
   registerToolHandlers();
   registerSearchHandlers();
+  registerChatHandlers();
 };

@@ -3,6 +3,20 @@ import { useChatStore } from '../../stores/chat_store';
 import { Message } from './message';
 import type { CommentEntry } from '../app_shell';
 
+/** Format a timestamp as a relative time string (pt-BR). */
+function relativeTime(ts: number): string {
+  const diff = Date.now() - ts;
+  const sec = Math.floor(diff / 1000);
+  if (sec < 60) return 'agora';
+  const min = Math.floor(sec / 60);
+  if (min < 60) return `${min}min`;
+  const hr = Math.floor(min / 60);
+  if (hr < 24) return `${hr}h`;
+  const day = Math.floor(hr / 24);
+  if (day < 7) return `${day}d`;
+  return new Date(ts).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+}
+
 const PENCIL_ICON = (
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5">
     <path d="M12 20h9" />
@@ -171,9 +185,27 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   const contextSnippets = useChatStore((s) => s.contextSnippets);
   const removePageContext = useChatStore((s) => s.removePageContext);
   const removeSnippetContext = useChatStore((s) => s.removeSnippetContext);
+  const activeSession = useChatStore((s) => s.activeSession);
+  const sessions = useChatStore((s) => s.sessions);
+  const newConversation = useChatStore((s) => s.newConversation);
+  const loadConversation = useChatStore((s) => s.loadConversation);
 
   const [input, setInput] = useState('');
+  const [sessionMenuOpen, setSessionMenuOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement | null>(null);
+  const sessionMenuRef = useRef<HTMLDivElement | null>(null);
+
+  // Close session menu on outside click
+  useEffect(() => {
+    if (!sessionMenuOpen) return;
+    const handle = (e: MouseEvent) => {
+      if (sessionMenuRef.current && !sessionMenuRef.current.contains(e.target as Node)) {
+        setSessionMenuOpen(false);
+      }
+    };
+    window.addEventListener('mousedown', handle);
+    return () => window.removeEventListener('mousedown', handle);
+  }, [sessionMenuOpen]);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
@@ -201,10 +233,72 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
         <>
           {/* Header with actions */}
           <div className="flex items-center justify-between px-3 py-1.5 border-b border-border shrink-0">
-            <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              Atlas
-            </span>
+            <div ref={sessionMenuRef} className="relative">
+              <button
+                onClick={() => setSessionMenuOpen((o) => !o)}
+                className="flex items-center gap-1 px-1.5 py-0.5 hover:bg-accent rounded text-xs font-semibold uppercase tracking-wide text-muted-foreground hover:text-foreground transition-colors"
+                title="Histórico de conversas"
+              >
+                <span className="truncate max-w-[140px]">
+                  {activeSession?.title ?? 'Atlas'}
+                </span>
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-3 h-3 shrink-0">
+                  <polyline points="6 9 12 15 18 9" />
+                </svg>
+              </button>
+              {sessionMenuOpen && (
+                <div className="absolute left-0 top-full mt-1 z-50 min-w-[220px] max-h-[320px] overflow-auto bg-card border border-border rounded-lg shadow-lg py-1 text-sm">
+                  <button
+                    onClick={() => { setSessionMenuOpen(false); void newConversation(); }}
+                    className="w-full text-left px-3 py-1.5 hover:bg-accent flex items-center gap-2 text-foreground"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5 text-muted-foreground shrink-0">
+                      <line x1="12" y1="5" x2="12" y2="19" />
+                      <line x1="5" y1="12" x2="19" y2="12" />
+                    </svg>
+                    <span className="text-xs">Nova conversa</span>
+                  </button>
+                  {sessions.length > 0 && (
+                    <>
+                      <div className="h-px bg-border my-1" />
+                      {sessions.map((s) => (
+                        <button
+                          key={s.id}
+                          onClick={() => { setSessionMenuOpen(false); void loadConversation(s.id); }}
+                          className={`w-full text-left px-3 py-1.5 hover:bg-accent flex items-center gap-2 ${
+                            s.id === activeSession?.id ? 'bg-accent/50' : ''
+                          }`}
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5 text-muted-foreground shrink-0">
+                            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                          </svg>
+                          <div className="flex-1 min-w-0">
+                            <span className="text-xs text-foreground block truncate">
+                              {s.title ?? 'Sem título'}
+                            </span>
+                            <span className="text-[10px] text-muted-foreground">
+                              {relativeTime(s.updatedAt)}
+                              {typeof s.messageCount === 'number' ? ` · ${s.messageCount} msgs` : ''}
+                            </span>
+                          </div>
+                        </button>
+                      ))}
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
             <div className="flex items-center gap-0.5">
+              <button
+                onClick={() => void newConversation()}
+                className="p-1 hover:bg-accent rounded text-muted-foreground hover:text-foreground transition-colors"
+                title="Nova conversa"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5">
+                  <path d="M12 20h9" />
+                  <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
+                </svg>
+              </button>
               {messages.length > 2 && !streaming && (
                 <button
                   onClick={() => void compactConversation()}
