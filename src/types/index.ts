@@ -189,6 +189,8 @@ export interface AppSettings {
   activeProvider: AIProvider;
   defaultModel: string;
   themeMode: ThemeMode;
+  /** Custom system prompt. Falls back to the built-in default when empty or undefined. */
+  systemPrompt?: string;
 }
 
 // ─── Search / Index Types ───────────────────────────────────────

@@ -32,11 +32,24 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
   const [statusMsg, setStatusMsg] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [confirmVault, setConfirmVault] = useState(false);
+  const [promptDraft, setPromptDraft] = useState(settings.systemPrompt ?? '');
+  const [defaultPrompt, setDefaultPrompt] = useState<string | null>(null);
+  const [promptSaved, setPromptSaved] = useState(false);
 
   // Probe current key status for the active provider on mount.
   useEffect(() => {
     void api.settings.hasApiKey(settings.activeProvider).then(setHasKey);
   }, [settings.activeProvider]);
+
+  // Load default prompt for placeholder display.
+  useEffect(() => {
+    void api.settings.getDefaultPrompt().then(setDefaultPrompt);
+  }, []);
+
+  // Sync draft when settings.systemPrompt changes externally.
+  useEffect(() => {
+    setPromptDraft(settings.systemPrompt ?? '');
+  }, [settings.systemPrompt]);
 
   // Close on Escape key
   useEffect(() => {
@@ -60,6 +73,20 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
 
   const handleModelChange = async (model: string) => {
     await update({ defaultModel: model });
+  };
+
+  const handleSavePrompt = async () => {
+    const trimmed = promptDraft.trim();
+    await update({ systemPrompt: trimmed || undefined });
+    setPromptSaved(true);
+    setTimeout(() => setPromptSaved(false), 2000);
+  };
+
+  const handleResetPrompt = async () => {
+    setPromptDraft('');
+    await update({ systemPrompt: undefined });
+    setPromptSaved(true);
+    setTimeout(() => setPromptSaved(false), 2000);
   };
 
   const handleSaveKey = async () => {
@@ -199,6 +226,45 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                 PROVIDERS.find((p) => p.id === settings.activeProvider)?.modelPlaceholder
               }
               className="w-full text-sm px-2 py-1 border border-input bg-card text-foreground rounded"
+            />
+          </section>
+
+          {/* System Prompt */}
+          <section>
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-sm font-semibold text-foreground">
+                Prompt do sistema
+              </label>
+              <div className="flex items-center gap-2">
+                {promptSaved && (
+                  <span className="text-xs text-success">Salvo.</span>
+                )}
+                <button
+                  onClick={handleResetPrompt}
+                  className="text-xs text-muted-foreground hover:text-foreground underline"
+                >
+                  Restaurar padrão
+                </button>
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground mb-2">
+              Define a personalidade e as regras do Atlas. Deixe em branco para usar o prompt padrão.
+            </p>
+            <textarea
+              value={promptDraft}
+              onChange={(e) => setPromptDraft(e.target.value)}
+              onBlur={() => {
+                const trimmed = promptDraft.trim();
+                const current = settings.systemPrompt ?? '';
+                if (trimmed !== current) {
+                  void handleSavePrompt();
+                }
+              }}
+              placeholder={defaultPrompt ?? 'Carregando prompt padrão…'}
+              rows={14}
+              className="w-full text-sm px-3 py-2 border border-input bg-card text-foreground rounded resize-y font-mono"
+              style={{ minHeight: '220px' }}
+              spellCheck={false}
             />
           </section>
 

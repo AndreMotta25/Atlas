@@ -116,6 +116,8 @@ const electronAPI = {
     get: (): Promise<AppSettings> => ipcRenderer.invoke(createChannel('settings', 'get')),
     set: (patch: Partial<AppSettings>): Promise<AppSettings> =>
       ipcRenderer.invoke(createChannel('settings', 'set'), patch),
+    getDefaultPrompt: (): Promise<string> =>
+      ipcRenderer.invoke(createChannel('settings', 'get-default-prompt')),
     setApiKey: (provider: AIProvider, key: string): Promise<{ success: boolean; error?: string }> =>
       ipcRenderer.invoke(createChannel('settings', 'set-api-key'), provider, key),
     hasApiKey: (provider: AIProvider): Promise<boolean> =>

@@ -2,6 +2,7 @@ import { ipcMain } from 'electron';
 import { createChannel } from '../types';
 import { ConfigStore } from '../vault/config_store';
 import { SecureStore } from '../vault/secure_store';
+import { DEFAULT_SYSTEM_PROMPT } from '../ai/orchestrator';
 import type { AIProvider, AppSettings } from '../types';
 
 export const registerSettingsHandlers = (): void => {
@@ -9,6 +10,10 @@ export const registerSettingsHandlers = (): void => {
 
   ipcMain.handle(createChannel('settings', 'set'), async (_e, patch: Partial<AppSettings>) => {
     return ConfigStore.update(patch);
+  });
+
+  ipcMain.handle(createChannel('settings', 'get-default-prompt'), async () => {
+    return DEFAULT_SYSTEM_PROMPT;
   });
 
   ipcMain.handle(
