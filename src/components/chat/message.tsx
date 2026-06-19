@@ -1,5 +1,6 @@
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import rehypeRaw from 'rehype-raw';
 import type { ChatMessage } from '../../types';
 import { ConfirmCard } from './confirm_card';
 import { ToolResultCard } from './tool_result_card';
@@ -32,7 +33,7 @@ export const Message: React.FC<MessageProps> = ({ message, streaming }) => {
           <div className="whitespace-pre-wrap">{message.content}</div>
         ) : message.content ? (
           <div className="max-w-none text-sm leading-relaxed [&_p]:my-1 [&_ul]:list-disc [&_ul]:pl-4 [&_ol]:list-decimal [&_ol]:pl-4 [&_pre]:bg-card [&_pre]:text-foreground [&_pre]:rounded [&_pre]:p-2 [&_code]:font-mono [&_code]:text-xs [&_h1]:font-bold [&_h1]:text-base [&_h2]:font-semibold [&_h2]:text-sm [&_a]:text-primary [&_a]:underline">
-            <ReactMarkdown remarkPlugins={[remarkGfm]}>{message.content}</ReactMarkdown>
+            <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>{message.content}</ReactMarkdown>
             {streaming && <span className="animate-pulse">▍</span>}
           </div>
         ) : streaming ? (

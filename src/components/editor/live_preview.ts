@@ -154,6 +154,33 @@ function decorateWikiLinksAndTags(view: EditorView, decos: Range<Decoration>[]) 
 const HIGHLIGHT_RE = /==([^=]+)==/g;
 const COMMENT_RE = /<!--c:(.+?)-->/g;
 
+// ─── HTML <aside> blocks ──────────────────────────────────────────
+
+const ASIDE_RE = /<aside(\s[^>]*)?>([\s\S]*?)<\/aside>/g;
+
+function decorateAsideBlocks(view: EditorView, decos: Range<Decoration>[]) {
+  for (const { from, to } of view.visibleRanges) {
+    const text = view.state.doc.sliceString(from, to);
+    ASIDE_RE.lastIndex = 0;
+    let m: RegExpExecArray | null;
+    while ((m = ASIDE_RE.exec(text))) {
+      const fullStart = from + m.index;
+      const innerStart = fullStart + m[0].indexOf('>') + 1;
+      const innerEnd = fullStart + m[0].lastIndexOf('</aside>');
+      const fullEnd = fullStart + m[0].length;
+      // Hide the opening and closing tags
+      hideRange(fullStart, innerStart, decos);
+      hideRange(innerEnd, fullEnd, decos);
+      // Style the content as an aside block
+      decos.push(
+        Decoration.mark({ class: 'atlas-aside' }).range(innerStart, innerEnd),
+      );
+    }
+  }
+}
+
+// ─── Highlights & comments (regex pass) ──────────────────────────
+
 function decorateHighlightsAndComments(view: EditorView, decos: Range<Decoration>[]) {
   const state = view.state;
 
@@ -228,6 +255,7 @@ function buildDecorations(view: EditorView): DecorationSet {
 
   decorateHighlightsAndComments(view, decos);
   decorateWikiLinksAndTags(view, decos);
+  decorateAsideBlocks(view, decos);
 
   return Decoration.set(decos, true);
 }
