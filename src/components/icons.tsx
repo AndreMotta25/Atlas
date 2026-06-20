@@ -148,10 +148,11 @@ export const SendIcon: React.FC<IconProps> = ({ className = 'w-4 h-4' }) => (
 
 export const CompressIcon: React.FC<IconProps> = ({ className = 'w-4 h-4' }) => (
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className={className}>
-    <polyline points="4 14 10 14 10 20" />
-    <polyline points="20 10 14 10 14 4" />
-    <line x1="14" y1="10" x2="21" y2="3" />
-    <line x1="3" y1="21" x2="10" y2="14" />
+    <polyline points="18 6 22 10 18 14" />
+    <line x1="22" y1="10" x2="14" y2="10" />
+    <polyline points="6 18 2 14 6 10" />
+    <line x1="2" y1="14" x2="10" y2="14" />
+    <line x1="12" y1="8" x2="12" y2="16" />
   </svg>
 );
 

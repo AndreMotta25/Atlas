@@ -721,17 +721,42 @@ input {
 /* ─── Highlights & Comments ─────────────────────────────────────── */
 
 .atlas-highlight {
-  background-color: #fef08a;
-  border-bottom: 2px solid #eab308;
   border-radius: 2px;
   cursor: help;
   padding: 0.05em 0;
 }
 
-.dark .atlas-highlight {
-  background-color: #3b3000;
-  border-bottom-color: #ca8a04;
-}
+/* Amarelo (default) */
+.atlas-hl-yellow  { background-color: #fef08a; border-bottom: 2px solid #eab308; }
+.dark .atlas-hl-yellow  { background-color: #3b3000; border-bottom-color: #ca8a04; }
+
+/* Verde */
+.atlas-hl-green   { background-color: #bbf7d0; border-bottom: 2px solid #4ade80; }
+.dark .atlas-hl-green   { background-color: #14532d; border-bottom-color: #22c55e; }
+
+/* Azul */
+.atlas-hl-blue    { background-color: #bfdbfe; border-bottom: 2px solid #60a5fa; }
+.dark .atlas-hl-blue    { background-color: #1e3a5f; border-bottom-color: #3b82f6; }
+
+/* Vermelho */
+.atlas-hl-red     { background-color: #fecaca; border-bottom: 2px solid #f87171; }
+.dark .atlas-hl-red     { background-color: #7f1d1d; border-bottom-color: #ef4444; }
+
+/* Laranja */
+.atlas-hl-orange  { background-color: #fed7aa; border-bottom: 2px solid #fb923c; }
+.dark .atlas-hl-orange  { background-color: #7c2d12; border-bottom-color: #f97316; }
+
+/* Roxo */
+.atlas-hl-purple  { background-color: #e9d5ff; border-bottom: 2px solid #c084fc; }
+.dark .atlas-hl-purple  { background-color: #3b0764; border-bottom-color: #a855f7; }
+
+/* Ciano */
+.atlas-hl-cyan    { background-color: #a5f3fc; border-bottom: 2px solid #22d3ee; }
+.dark .atlas-hl-cyan    { background-color: #164e63; border-bottom-color: #06b6d4; }
+
+/* Cinza */
+.atlas-hl-gray    { background-color: #e2e8f0; border-bottom: 2px solid #94a3b8; }
+.dark .atlas-hl-gray    { background-color: #334155; border-bottom-color: #64748b; }
 
 /* Markers hidden via mark-based decoration (not replace) to avoid
    corrupting CodeMirror's DOM↔document position mapping. */

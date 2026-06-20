@@ -183,6 +183,34 @@ export interface UndoResult {
   error?: string;
 }
 
+// ─── Highlight Types ────────────────────────────────────────────
+export const HIGHLIGHT_COLORS = [
+  { name: 'Amarelo',  value: 'yellow',  light: '#fef08a', dark: '#3b3000', border: '#eab308', borderDark: '#ca8a04' },
+  { name: 'Verde',    value: 'green',   light: '#bbf7d0', dark: '#14532d', border: '#4ade80', borderDark: '#22c55e' },
+  { name: 'Azul',     value: 'blue',    light: '#bfdbfe', dark: '#1e3a5f', border: '#60a5fa', borderDark: '#3b82f6' },
+  { name: 'Vermelho', value: 'red',     light: '#fecaca', dark: '#7f1d1d', border: '#f87171', borderDark: '#ef4444' },
+  { name: 'Laranja',  value: 'orange',  light: '#fed7aa', dark: '#7c2d12', border: '#fb923c', borderDark: '#f97316' },
+  { name: 'Roxo',     value: 'purple',  light: '#e9d5ff', dark: '#3b0764', border: '#c084fc', borderDark: '#a855f7' },
+  { name: 'Ciano',    value: 'cyan',    light: '#a5f3fc', dark: '#164e63', border: '#22d3ee', borderDark: '#06b6d4' },
+  { name: 'Cinza',    value: 'gray',    light: '#e2e8f0', dark: '#334155', border: '#94a3b8', borderDark: '#64748b' },
+] as const;
+
+export type HighlightColor = (typeof HIGHLIGHT_COLORS)[number]['value'];
+export const DEFAULT_HIGHLIGHT_COLOR: HighlightColor = 'yellow';
+
+/** Parse the content of a <!--c:...--> annotation.
+ *  Format: comment|color  (e.g. "my note|green" or "|blue" for color-only).
+ *  Backwards-compatible: plain "comment" → default yellow. */
+export function parseCommentAnnotation(raw: string): { comment: string; color: string } {
+  const pipe = raw.lastIndexOf('|');
+  if (pipe === -1) return { comment: raw, color: 'yellow' };
+  const maybeColor = raw.slice(pipe + 1);
+  if (/^[a-z]+$/.test(maybeColor)) {
+    return { comment: raw.slice(0, pipe), color: maybeColor };
+  }
+  return { comment: raw, color: 'yellow' };
+}
+
 // ─── Settings Types ─────────────────────────────────────────────
 export interface AppSettings {
   vaultPath: string | null;

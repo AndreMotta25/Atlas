@@ -277,7 +277,20 @@ function decorateWikiLinksAndTags(view: EditorView, decos: Range<Decoration>[]) 
 // ─── Highlights & comments (regex pass) ──────────────────────────
 
 const HIGHLIGHT_RE = /==([^=]+)==/g;
-const COMMENT_RE = /<!--c:(.+?)-->/g;
+
+/** Parse the content of a <!--c:...--> annotation.
+ *  Format: comment|color  (e.g. "my note|green" or "|blue" for color-only).
+ *  Backwards-compatible: plain "comment" → yellow. */
+function parseCommentAnnotation(raw: string): { comment: string; color: string } {
+  const pipe = raw.lastIndexOf('|');
+  if (pipe === -1) return { comment: raw, color: 'yellow' };
+  const maybeColor = raw.slice(pipe + 1);
+  // Only treat as color if it looks like a known color name (no spaces, common chars).
+  if (/^[a-z]+$/.test(maybeColor)) {
+    return { comment: raw.slice(0, pipe), color: maybeColor };
+  }
+  return { comment: raw, color: 'yellow' };
+}
 
 function decorateHighlightsAndComments(view: EditorView, decos: Range<Decoration>[]) {
   const state = view.state;
@@ -293,20 +306,23 @@ function decorateHighlightsAndComments(view: EditorView, decos: Range<Decoration
       if (isInsideCodeBlock(state, fullStart) || isInsideCodeBlock(state, fullEnd - 1)) continue;
       const contentStart = fullStart + 2; // after ==
       const contentEnd = fullEnd - 2;     // before ==
+
+      // Look for comment annotation right after the highlight
+      const after = state.doc.sliceString(fullEnd, Math.min(fullEnd + 50, state.doc.length));
+      const cm = /^<!--c:(.+?)-->/.exec(after);
+      let color = 'yellow';
+      if (cm) {
+        const parsed = parseCommentAnnotation(cm[1]);
+        color = parsed.color;
+        // Hide the comment markup
+        hideRangeMark(fullEnd, fullEnd + cm[0].length, decos);
+      }
+
       // Hide the == marks (use mark-based hiding to avoid DOM↔doc mapping issues)
       hideRangeMark(fullStart, contentStart, decos);
       hideRangeMark(contentEnd, fullEnd, decos);
-      // Highlight the content
-      safeMark('atlas-highlight', contentStart, contentEnd, decos);
-    }
-
-    COMMENT_RE.lastIndex = 0;
-    while ((m = COMMENT_RE.exec(text))) {
-      const start = from + m.index;
-      const end = start + m[0].length;
-      if (isInsideCodeBlock(state, start) || isInsideCodeBlock(state, end - 1)) continue;
-      // Hide the entire comment markup (mark-based to avoid mapping corruption)
-      hideRangeMark(start, end, decos);
+      // Apply color-specific highlight
+      safeMark(`atlas-highlight atlas-hl-${color}`, contentStart, contentEnd, decos);
     }
   }
 }
@@ -339,9 +355,10 @@ function decorateAsideBlocks(view: EditorView, decos: Range<Decoration>[]) {
 /** Find a comment adjacent to a position (looks forward up to 50 chars). */
 export function findCommentAt(state: { doc: { sliceString: (from: number, to: number) => string }; length: number }, pos: number): string | null {
   const slice = state.doc.sliceString(pos, Math.min(pos + 50, state.length));
-  const m = COMMENT_RE.exec(slice);
-  COMMENT_RE.lastIndex = 0;
-  return m ? m[1].trim() : null;
+  const m = /^<!--c:(.+?)-->/.exec(slice);
+  if (!m) return null;
+  const parsed = parseCommentAnnotation(m[1]);
+  return parsed.comment.trim() || null;
 }
 
 // ─── Main builder ────────────────────────────────────────────────

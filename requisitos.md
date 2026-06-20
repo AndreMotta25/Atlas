@@ -33,5 +33,5 @@
 [x] - Coloque um botão para apagar uma pagina/pasta
 [x] - Coloque um botão para apagar a conversa do chat.
 [x] - revisar o prompt do atlas com o glm 5.2
-[ ] - Quando iniciar a aplicação o editor deve estar bloqueado até que um arquivo seja criado ou selecionado(aberto).
+[x] - Quando iniciar a aplicação o editor deve estar bloqueado até que um arquivo seja criado ou selecionado(aberto).
 [x] - Permitir que o modelo faça buscas na internet

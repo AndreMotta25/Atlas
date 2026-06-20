@@ -1,21 +1,24 @@
 import { useEffect, useRef, useState } from 'react';
+import { HIGHLIGHT_COLORS, DEFAULT_HIGHLIGHT_COLOR, type HighlightColor } from '../../types';
 
 interface CommentPopupProps {
   highlightText: string;
   initialComment?: string;
+  initialColor?: HighlightColor;
   mode: 'create' | 'edit';
   position: { x: number; y: number };
-  onSave: (comment: string) => void;
+  onSave: (comment: string, color: HighlightColor) => void;
   onCancel: () => void;
   onDelete?: () => void;
 }
 
 const POPUP_WIDTH = 320;
-const POPUP_HEIGHT = 240;
+const POPUP_HEIGHT = 280;
 
 export const CommentPopup: React.FC<CommentPopupProps> = ({
   highlightText,
   initialComment = '',
+  initialColor = DEFAULT_HIGHLIGHT_COLOR,
   mode,
   position,
   onSave,
@@ -23,6 +26,7 @@ export const CommentPopup: React.FC<CommentPopupProps> = ({
   onDelete,
 }) => {
   const [comment, setComment] = useState(initialComment);
+  const [color, setColor] = useState<HighlightColor>(initialColor);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
   useEffect(() => {
@@ -39,12 +43,12 @@ export const CommentPopup: React.FC<CommentPopupProps> = ({
         onCancel();
       } else if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
         e.preventDefault();
-        onSave(comment.trim());
+        onSave(comment.trim(), color);
       }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [comment, onCancel, onSave]);
+  }, [comment, color, onCancel, onSave]);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -61,8 +65,7 @@ export const CommentPopup: React.FC<CommentPopupProps> = ({
 
   const handleSave = () => {
     const trimmed = comment.trim();
-    if (!trimmed) return;
-    onSave(trimmed);
+    onSave(trimmed, color);
   };
 
   return (
@@ -85,7 +88,7 @@ export const CommentPopup: React.FC<CommentPopupProps> = ({
         </div>
 
         {/* Body */}
-        <div className="p-3 flex flex-col gap-2">
+        <div className="p-3 flex flex-col gap-2.5">
           <textarea
             ref={textareaRef}
             value={comment}
@@ -94,6 +97,23 @@ export const CommentPopup: React.FC<CommentPopupProps> = ({
             rows={3}
             className="w-full resize-none text-sm px-2 py-1.5 border border-input bg-background text-foreground rounded focus:outline-none focus:border-primary"
           />
+          {/* Color picker */}
+          <div>
+            <span className="text-[10px] text-muted-foreground/70 mb-1.5 block">Cor do destaque</span>
+            <div className="flex flex-wrap gap-1.5">
+              {HIGHLIGHT_COLORS.map((c) => (
+                <button
+                  key={c.value}
+                  onClick={() => setColor(c.value)}
+                  title={c.name}
+                  className={`w-6 h-6 rounded-full border-2 transition-all hover:scale-110 ${
+                    color === c.value ? 'border-primary scale-110 ring-2 ring-primary/30' : 'border-border hover:border-muted-foreground'
+                  }`}
+                  style={{ backgroundColor: c.light }}
+                />
+              ))}
+            </div>
+          </div>
           <span className="text-[10px] text-muted-foreground/70">
             Enter para nova linha · Ctrl+Enter salva · Esc cancela
           </span>
@@ -126,10 +146,9 @@ export const CommentPopup: React.FC<CommentPopupProps> = ({
             </button>
             <button
               onClick={handleSave}
-              disabled={!comment.trim()}
-              className="px-3 py-1 bg-primary text-primary-foreground text-xs rounded hover:brightness-90 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+              className="px-3 py-1 bg-primary text-primary-foreground text-xs rounded hover:brightness-90 transition-all"
             >
-              Salvar
+              {mode === 'create' ? (comment.trim() ? 'Salvar' : 'Destacar') : 'Salvar'}
             </button>
           </div>
         </div>

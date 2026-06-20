@@ -6,6 +6,7 @@ import {
   PencilIcon, TrashIcon, QuoteIcon, PlusIcon, ChevronDown,
   CompressIcon, Minus, ChatIcon, ChevronLeft, ChevronRight, CommentEmptyIcon, CloseIcon, FileIcon, HighlighterIcon,
 } from '../icons';
+import { HIGHLIGHT_COLORS } from '../../types';
 
 /** Format a timestamp as a relative time string (pt-BR). */
 function relativeTime(ts: number): string {
@@ -69,7 +70,11 @@ const CommentCard: React.FC<CommentCardProps> = ({
 
         <div className="flex-1 min-w-0">
           {/* Texto destacado */}
-          <p className="text-[11px] text-muted-foreground italic mb-1.5 line-clamp-2 break-words">
+          <p className="text-[11px] text-muted-foreground italic mb-1.5 line-clamp-2 break-words flex items-start gap-1.5">
+            <span
+              className="w-2.5 h-2.5 rounded-full shrink-0 mt-0.5 border border-black/10 dark:border-white/10"
+              style={{ backgroundColor: HIGHLIGHT_COLORS.find((hc) => hc.value === comment.color)?.light ?? '#fef08a' }}
+            />
             &ldquo;{comment.text}&rdquo;
           </p>
 

@@ -19,6 +19,7 @@ export interface CommentEntry {
   pos: number;
   text: string;
   comment: string;
+  color: string;
 }
 
 const MIN_SIDEBAR = 180;

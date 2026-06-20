@@ -38,8 +38,9 @@ import { ContextMenu, type MenuEntry } from './context_menu';
 import { CommentPopup } from './comment_popup';
 import type { CommentEntry } from '../app_shell';
 import {
-  ChatIcon, FormatIcon, EyeIcon, PencilIcon, TrashIcon,
+  ChatIcon, FormatIcon, EyeIcon, PencilIcon, TrashIcon, SendIcon,
 } from '../icons';
+import { HIGHLIGHT_COLORS, parseCommentAnnotation, DEFAULT_HIGHLIGHT_COLOR, type HighlightColor } from '../../types';
 import { api } from '../../lib/api';
 import {
   changeIndent,
@@ -102,6 +103,7 @@ export const EditorPane: React.FC<EditorPaneProps> = ({ onCommentsChange, onComm
     docFrom: number;
     docTo: number;
     text: string;
+    color: HighlightColor;
     screenX: number;
     screenY: number;
   } | null>(null);
@@ -111,6 +113,7 @@ export const EditorPane: React.FC<EditorPaneProps> = ({ onCommentsChange, onComm
     index: number;
     text: string;
     comment: string;
+    color: HighlightColor;
     screenX: number;
     screenY: number;
   } | null>(null);
@@ -127,7 +130,8 @@ export const EditorPane: React.FC<EditorPaneProps> = ({ onCommentsChange, onComm
       const after = doc.slice(hm.index + hm[0].length, hm.index + hm[0].length + 50);
       const cm = /<!--c:(.+?)-->/.exec(after);
       if (cm) {
-        results.push({ pos: hm.index, text: hm[1], comment: cm[1].trim() });
+        const parsed = parseCommentAnnotation(cm[1]);
+        results.push({ pos: hm.index, text: hm[1], comment: parsed.comment.trim(), color: parsed.color });
       }
     }
     return results;
@@ -145,19 +149,21 @@ export const EditorPane: React.FC<EditorPaneProps> = ({ onCommentsChange, onComm
     // Re-read comments from current document
     const doc = view.state.doc.toString();
     const currentComments: CommentEntry[] = [];
-    const HIGHLIGHT_GLOBAL = /==([^=]+)==/g;
+    const re = /==([^=]+)==/g;
     let hm: RegExpExecArray | null;
-    while ((hm = HIGHLIGHT_GLOBAL.exec(doc))) {
+    while ((hm = re.exec(doc))) {
       const after = doc.slice(hm.index + hm[0].length, hm.index + hm[0].length + 50);
       const cm = /<!--c:(.+?)-->/.exec(after);
-      if (cm) currentComments.push({ pos: hm.index, text: hm[1], comment: cm[1].trim() });
+      if (cm) {
+        const parsed = parseCommentAnnotation(cm[1]);
+        currentComments.push({ pos: hm.index, text: hm[1], comment: parsed.comment.trim(), color: parsed.color });
+      }
     }
     const c = currentComments[index];
     if (!c) return;
 
     const escText = c.text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const escComment = c.comment.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const regex = new RegExp(`==${escText}==<!--c:${escComment}-->`, 'g');
+    const regex = new RegExp(`==${escText}==(<!--c:.*?-->)?`, 'g');
     const match = regex.exec(doc);
     if (!match) return;
 
@@ -172,24 +178,28 @@ export const EditorPane: React.FC<EditorPaneProps> = ({ onCommentsChange, onComm
     if (!view) return;
     const doc = view.state.doc.toString();
     const currentComments: CommentEntry[] = [];
-    const HIGHLIGHT_GLOBAL = /==([^=]+)==/g;
+    const re = /==([^=]+)==/g;
     let hm: RegExpExecArray | null;
-    while ((hm = HIGHLIGHT_GLOBAL.exec(doc))) {
+    while ((hm = re.exec(doc))) {
       const after = doc.slice(hm.index + hm[0].length, hm.index + hm[0].length + 50);
       const cm = /<!--c:(.+?)-->/.exec(after);
-      if (cm) currentComments.push({ pos: hm.index, text: hm[1], comment: cm[1].trim() });
+      if (cm) {
+        const parsed = parseCommentAnnotation(cm[1]);
+        currentComments.push({ pos: hm.index, text: hm[1], comment: parsed.comment.trim(), color: parsed.color });
+      }
     }
     const c = currentComments[index];
     if (!c) return;
 
     const escText = c.text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const escComment = c.comment.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const regex = new RegExp(`==${escText}==<!--c:${escComment}-->`, 'g');
+    const regex = new RegExp(`==${escText}==(<!--c:.*?-->)?`, 'g');
     const match = regex.exec(doc);
     if (!match) return;
 
+    const colorSuffix = c.color !== 'yellow' ? `|${c.color}` : '';
+    const annotation = newComment.trim() ? `<!--c:${newComment}${colorSuffix}-->` : `<!--c:|${c.color}-->`;
     view.dispatch({
-      changes: { from: match.index, to: match.index + match[0].length, insert: `==${c.text}==<!--c:${newComment}-->` },
+      changes: { from: match.index, to: match.index + match[0].length, insert: `==${c.text}==${annotation}` },
     });
   };
 
@@ -215,6 +225,7 @@ export const EditorPane: React.FC<EditorPaneProps> = ({ onCommentsChange, onComm
           index: idx,
           text: c.text,
           comment: c.comment,
+          color: c.color as HighlightColor,
           screenX: coords?.left ?? e.clientX,
           screenY: (coords?.bottom ?? e.clientY) + 6,
         });
@@ -382,23 +393,25 @@ export const EditorPane: React.FC<EditorPaneProps> = ({ onCommentsChange, onComm
     const screenX = coords?.left ?? menuPos?.x ?? window.innerWidth / 2;
     const screenY = (coords?.bottom ?? menuPos?.y ?? window.innerHeight / 2) + 6;
 
-    setCommentDraft({ docFrom: sel.from, docTo: sel.to, text, screenX, screenY });
+    setCommentDraft({ docFrom: sel.from, docTo: sel.to, text, color: DEFAULT_HIGHLIGHT_COLOR, screenX, screenY });
   };
 
-  const commitCreate = (comment: string) => {
+  const commitCreate = (comment: string, color: HighlightColor) => {
     const view = viewRef.current;
     if (!view || !commentDraft) return;
+    const colorSuffix = color !== 'yellow' ? `|${color}` : '';
+    const annotation = comment ? `<!--c:${comment}${colorSuffix}-->` : `<!--c:|${color}-->`;
     view.dispatch({
       changes: {
         from: commentDraft.docFrom,
         to: commentDraft.docTo,
-        insert: `==${commentDraft.text}==<!--c:${comment}-->`,
+        insert: `==${commentDraft.text}==${annotation}`,
       },
     });
     setCommentDraft(null);
   };
 
-  const commitEdit = (comment: string) => {
+  const commitEdit = (comment: string, color: HighlightColor) => {
     const view = viewRef.current;
     if (!view || !commentEdit) return;
     const c = commentEdit;
@@ -408,11 +421,13 @@ export const EditorPane: React.FC<EditorPaneProps> = ({ onCommentsChange, onComm
     const regex = new RegExp(`==${escText}==(<!--c:.*?-->)?`);
     const match = regex.exec(doc);
     if (match) {
+      const colorSuffix = color !== 'yellow' ? `|${color}` : '';
+      const annotation = comment ? `<!--c:${comment}${colorSuffix}-->` : `<!--c:|${color}-->`;
       view.dispatch({
         changes: {
           from: match.index,
           to: match.index + match[0].length,
-          insert: `==${c.text}==<!--c:${comment}-->`,
+          insert: `==${c.text}==${annotation}`,
         },
       });
     }
@@ -489,6 +504,12 @@ export const EditorPane: React.FC<EditorPaneProps> = ({ onCommentsChange, onComm
     }
   };
 
+  const sendPageToAtlas = () => {
+    if (!currentPath) return;
+    const chatStore = useChatStore.getState();
+    chatStore.loadPageContext(currentPath);
+  };
+
   const sendSelectionToAtlas = () => {
     const view = viewRef.current;
     if (!view) return;
@@ -504,6 +525,20 @@ export const EditorPane: React.FC<EditorPaneProps> = ({ onCommentsChange, onComm
       chatStore.loadPageContext(currentPath);
     }
     setMenuPos(null);
+  };
+
+  const addHighlightWithColor = (color: HighlightColor) => {
+    const view = viewRef.current;
+    if (!view) return;
+    const sel = view.state.selection.main;
+    const text = view.state.sliceDoc(sel.from, sel.to) || 'texto';
+    view.dispatch({
+      changes: {
+        from: sel.from,
+        to: sel.to,
+        insert: `==${text}==<!--c:|${color}-->`,
+      },
+    });
   };
 
   const buildMenu = (): MenuEntry[] => {
@@ -563,7 +598,17 @@ export const EditorPane: React.FC<EditorPaneProps> = ({ onCommentsChange, onComm
       { type: 'item', label: 'Aumentar recuo', icon: INDENT, shortcut: 'Tab',  onSelect: () => changeIndent(view, 2) },
       { type: 'item', label: 'Diminuir recuo', icon: OUTDENT, shortcut: 'Shift+Tab', onSelect: () => changeIndent(view, -2) },
       { type: 'separator' },
-      { type: 'item', label: 'Destacar', shortcut: '==', icon: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 11L2 14M4 10L7 7M9 6l3-3M6 12l5-5M3 9l5-5"/><rect x="8.5" y="0.5" width="5" height="5" rx="1" transform="rotate(45 11 3)"/></svg>`, onSelect: () => wrapSelection(view, '==') },
+      {
+        type: 'submenu',
+        label: 'Destacar',
+        icon: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 11L2 14M4 10L7 7M9 6l3-3M6 12l5-5M3 9l5-5"/><rect x="8.5" y="0.5" width="5" height="5" rx="1" transform="rotate(45 11 3)"/></svg>`,
+        children: HIGHLIGHT_COLORS.map((hc) => ({
+          type: 'item' as const,
+          label: hc.name,
+          icon: `<span style="display:inline-block;width:14px;height:14px;border-radius:3px;background-color:${hc.light};border:1px solid ${hc.border}"></span>`,
+          onSelect: () => addHighlightWithColor(hc.value),
+        })),
+      },
       { type: 'item', label: 'Comentário', icon: COMMENT, onSelect: addComment },
       { type: 'item', label: 'Formatar', icon: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><line x1="2" y1="4" x2="11" y2="4"/><line x1="2" y1="8" x2="14" y2="8"/><line x1="2" y1="12" x2="8" y2="12"/><polyline points="12 10 14 8 12 6"/></svg>`, onSelect: formatDocument },
     ];
@@ -592,20 +637,28 @@ export const EditorPane: React.FC<EditorPaneProps> = ({ onCommentsChange, onComm
               {currentPath && (
                 <div className="flex items-center gap-0.5 shrink-0">
                   <button
+                    onClick={sendPageToAtlas}
+                    className="p-1.5 hover:bg-accent rounded text-muted-foreground hover:text-primary transition-colors"
+                    title="Adicionar página ao Atlas"
+                    aria-label="Adicionar página ao Atlas"
+                  >
+                    <SendIcon className="w-4 h-4" />
+                  </button>
+                  <button
                     onClick={startRename}
-                    className="p-1 hover:bg-accent rounded text-muted-foreground hover:text-foreground transition-colors"
+                    className="p-1.5 hover:bg-accent rounded text-muted-foreground hover:text-foreground transition-colors"
                     title="Renomear"
                     aria-label="Renomear"
                   >
-                    <PencilIcon className="w-3 h-3" />
+                    <PencilIcon className="w-4 h-4" />
                   </button>
                   <button
                     onClick={() => void handleDelete()}
-                    className="p-1 hover:bg-accent rounded text-muted-foreground hover:text-destructive transition-colors"
+                    className="p-1.5 hover:bg-accent rounded text-muted-foreground hover:text-destructive transition-colors"
                     title="Apagar"
                     aria-label="Apagar"
                   >
-                    <TrashIcon className="w-3 h-3" />
+                    <TrashIcon className="w-4 h-4" />
                   </button>
                 </div>
               )}
@@ -615,21 +668,21 @@ export const EditorPane: React.FC<EditorPaneProps> = ({ onCommentsChange, onComm
         <div className="flex items-center gap-1 shrink-0">
           <button
             onClick={() => onSetTab(chatTab === 'comments' ? 'chat' : 'comments')}
-            className={`p-1 rounded transition-colors shrink-0 ${
+            className={`p-1.5 rounded transition-colors shrink-0 ${
               chatTab === 'comments'
                 ? 'bg-primary text-primary-foreground'
                 : 'text-muted-foreground hover:text-foreground hover:bg-accent'
             }`}
             title={`Comentários${commentCount > 0 ? ` (${commentCount})` : ''}`}
           >
-            <ChatIcon className="w-3.5 h-3.5 shrink-0" />
+            <ChatIcon className="w-4 h-4 shrink-0" />
           </button>
           <button
             onClick={formatDocument}
             title="Formatar Markdown"
-            className="p-1 hover:bg-accent rounded text-muted-foreground hover:text-foreground transition-colors"
+            className="p-1.5 hover:bg-accent rounded text-muted-foreground hover:text-foreground transition-colors"
           >
-            <FormatIcon className="w-3.5 h-3.5" />
+            <FormatIcon className="w-4 h-4" />
           </button>
           <select
             value={fontFamily ?? ''}
@@ -673,7 +726,7 @@ export const EditorPane: React.FC<EditorPaneProps> = ({ onCommentsChange, onComm
               view.dispatch({ effects: setLivePreviewMode.of(next) });
               setPreviewMode(next);
             }}
-            className={`p-1 rounded transition-colors shrink-0 ${
+            className={`p-1.5 rounded transition-colors shrink-0 ${
               previewMode === 0
                 ? 'text-muted-foreground hover:text-foreground hover:bg-accent'
                 : 'bg-yellow-500/20 text-yellow-700 dark:text-yellow-400 hover:bg-yellow-500/30'
@@ -681,7 +734,7 @@ export const EditorPane: React.FC<EditorPaneProps> = ({ onCommentsChange, onComm
             title={`Preview: ${previewMode === 0 ? 'Full' : previewMode === 1 ? 'Syntax only' : 'Off'} — clica pra ciclar`}
           >
             <span className={`relative inline-flex items-center ${previewMode === 2 ? 'atlas-eye-off' : ''}`}>
-              <EyeIcon className="w-3.5 h-3.5" />
+              <EyeIcon className="w-4 h-4" />
             </span>
             {previewMode !== 0 && (
               <span className="text-[10px] ml-1 tabular-nums">{previewMode}</span>
@@ -722,6 +775,7 @@ export const EditorPane: React.FC<EditorPaneProps> = ({ onCommentsChange, onComm
         <CommentPopup
           mode="create"
           highlightText={commentDraft.text}
+          initialColor={commentDraft.color}
           position={{ x: commentDraft.screenX, y: commentDraft.screenY }}
           onSave={commitCreate}
           onCancel={() => setCommentDraft(null)}
@@ -733,6 +787,7 @@ export const EditorPane: React.FC<EditorPaneProps> = ({ onCommentsChange, onComm
           mode="edit"
           highlightText={commentEdit.text}
           initialComment={commentEdit.comment}
+          initialColor={commentEdit.color}
           position={{ x: commentEdit.screenX, y: commentEdit.screenY }}
           onSave={commitEdit}
           onCancel={() => setCommentEdit(null)}
