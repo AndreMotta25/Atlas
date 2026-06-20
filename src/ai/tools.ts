@@ -2,6 +2,8 @@ import { tool } from 'ai';
 import { z } from 'zod';
 import { VaultManager } from '../vault/manager';
 import { DatabaseService } from '../vault/db';
+import { SecureStore } from '../vault/secure_store';
+import { tavilySearch, tavilyExtract, TavilyError } from './tavily_client';
 import type { ToolSet } from 'ai';
 
 /**
@@ -172,6 +174,111 @@ const getBacklinksTool = tool({
   },
 });
 
+/**
+ * Resolve a chave Tavily em runtime do SecureStore. Retorna null quando não
+ * configurada — a tool decide como relatar o erro ao modelo.
+ */
+const getTavilyKey = (): string | null => SecureStore.getApiKey('tavily');
+
+const webSearchTool = tool({
+  description:
+    'Pesquisa na web via Tavily. Use quando a pergunta exigir conhecimento ' +
+    'externo (eventos recentes, tópicos além do vault, dados atuais). ' +
+    'Retorna resultados ranqueados com título, URL e trecho, e opcionalmente ' +
+    'uma resposta sintetizada. Sempre prefira search() local antes desta.',
+  inputSchema: z.object({
+    query: z.string().describe('Termo ou frase de busca em português ou inglês.'),
+    maxResults: z
+      .number()
+      .int()
+      .positive()
+      .max(10)
+      .optional()
+      .describe('Número máximo de resultados (padrão 8).'),
+  }),
+  execute: async ({ query, maxResults }) => {
+    const apiKey = getTavilyKey();
+    if (!apiKey) {
+      return {
+        success: false,
+        query,
+        error: 'Tavily API key não configurada. Peça ao usuário para adicioná-la em Configurações.',
+      };
+    }
+    try {
+      const resp = await tavilySearch(apiKey, {
+        query,
+        maxResults: maxResults ?? 8,
+        searchDepth: 'advanced',
+        includeAnswer: true,
+      });
+      return {
+        success: true,
+        query,
+        count: resp.results.length,
+        answer: resp.answer,
+        results: resp.results.map((r) => ({
+          title: r.title,
+          url: r.url,
+          snippet: r.content.slice(0, 600),
+          score: r.score,
+        })),
+      };
+    } catch (err) {
+      const msg =
+        err instanceof TavilyError
+          ? err.message
+          : err instanceof Error
+            ? err.message
+            : String(err);
+      return { success: false, query, error: msg };
+    }
+  },
+});
+
+const webExtractTool = tool({
+  description:
+    'Extrai o conteúdo limpo de até 5 URLs específicas (markdown/plain text). ' +
+    'Use quando os snippets do web_search não forem suficientes para uma fonte ' +
+    'relevante. Não use em páginas que já retornaram conteúdo suficiente.',
+  inputSchema: z.object({
+    urls: z
+      .array(z.string().url())
+      .min(1)
+      .max(5)
+      .describe('Lista de URLs HTTP(S) para extrair conteúdo completo.'),
+  }),
+  execute: async ({ urls }) => {
+    const apiKey = getTavilyKey();
+    if (!apiKey) {
+      return {
+        success: false,
+        error: 'Tavily API key não configurada. Peça ao usuário para adicioná-la em Configurações.',
+      };
+    }
+    try {
+      const resp = await tavilyExtract(apiKey, { urls });
+      return {
+        success: true,
+        count: resp.results.length,
+        results: resp.results.map((r) => ({
+          url: r.url,
+          content: r.rawContent.slice(0, 8000),
+        })),
+        failed: resp.failed ?? [],
+      };
+    } catch (err) {
+      const msg =
+        err instanceof TavilyError
+          ? err.message
+          : err instanceof Error
+            ? err.message
+            : String(err);
+      return { success: false, error: msg };
+    }
+  },
+});
+
 export const TOOLS: ToolSet = {
   read_page: readPageTool,
   list_pages: listPagesTool,
@@ -179,6 +286,8 @@ export const TOOLS: ToolSet = {
   edit_page: editPageTool,
   search: searchTool,
   get_backlinks: getBacklinksTool,
+  web_search: webSearchTool,
+  web_extract: webExtractTool,
 };
 
 export const WRITE_TOOLS = new Set<string>(['create_page', 'edit_page']);

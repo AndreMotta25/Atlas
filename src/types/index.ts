@@ -83,7 +83,7 @@ export interface VaultStatus {
 }
 
 // ─── AI Types ───────────────────────────────────────────────────
-export type AIProvider = 'deepseek' | 'openai' | 'anthropic' | 'ollama';
+export type AIProvider = 'deepseek' | 'openai' | 'anthropic' | 'ollama' | 'tavily';
 
 export interface ChatMessage {
   id: string;
@@ -112,7 +112,7 @@ export interface ChatStartResult {
 }
 
 // ─── AI Tool Types ──────────────────────────────────────────────
-export type ToolKind = 'read_page' | 'list_pages' | 'create_page' | 'edit_page' | 'search' | 'get_backlinks';
+export type ToolKind = 'read_page' | 'list_pages' | 'create_page' | 'edit_page' | 'search' | 'get_backlinks' | 'web_search' | 'web_extract';
 
 export type EditPageMode = 'replace' | 'append' | 'replace_section';
 

@@ -38,8 +38,9 @@ import { ContextMenu, type MenuEntry } from './context_menu';
 import { CommentPopup } from './comment_popup';
 import type { CommentEntry } from '../app_shell';
 import {
-  ChatIcon, FormatIcon, EyeIcon,
+  ChatIcon, FormatIcon, EyeIcon, PencilIcon, TrashIcon,
 } from '../icons';
+import { api } from '../../lib/api';
 import {
   changeIndent,
   insertHorizontalRule,
@@ -86,6 +87,8 @@ export const EditorPane: React.FC<EditorPaneProps> = ({ onCommentsChange, onComm
   const updateSettings = useSettingsStore((s) => s.update);
 
   const [menuPos, setMenuPos] = useState<{ x: number; y: number } | null>(null);
+  const [renaming, setRenaming] = useState(false);
+  const [renameDraft, setRenameDraft] = useState('');
 
   // Debug toggle for live preview mode (Alt+L cycles 0 → 1 → 2 → 0).
   const [previewMode, setPreviewMode] = useState<LivePreviewMode>(0);
@@ -447,6 +450,45 @@ export const EditorPane: React.FC<EditorPaneProps> = ({ onCommentsChange, onComm
     });
   };
 
+  const startRename = () => {
+    if (!currentPath) return;
+    setRenameDraft(currentPath);
+    setRenaming(true);
+  };
+
+  const submitRename = async () => {
+    if (!currentPath || !renameDraft.trim()) return;
+    const newName = renameDraft.trim();
+    if (newName === currentPath) {
+      setRenaming(false);
+      return;
+    }
+    try {
+      await api.vault.rename(currentPath, newName);
+      const loadTree = useVaultStore.getState().loadTree;
+      await loadTree();
+      const openPage = useVaultStore.getState().openPage;
+      await openPage(newName);
+    } catch (err) {
+      console.error('Falha ao renomear:', err);
+    }
+    setRenaming(false);
+  };
+
+  const handleDelete = async () => {
+    if (!currentPath) return;
+    const name = currentPath.split('/').pop() || currentPath;
+    if (!window.confirm(`Tem certeza que deseja apagar "${name}"?`)) return;
+    try {
+      await api.vault.delete(currentPath);
+      useVaultStore.setState({ currentPath: null, currentContent: '', dirty: false });
+      const loadTree = useVaultStore.getState().loadTree;
+      await loadTree();
+    } catch (err) {
+      console.error('Falha ao apagar:', err);
+    }
+  };
+
   const sendSelectionToAtlas = () => {
     const view = viewRef.current;
     if (!view) return;
@@ -521,6 +563,7 @@ export const EditorPane: React.FC<EditorPaneProps> = ({ onCommentsChange, onComm
       { type: 'item', label: 'Aumentar recuo', icon: INDENT, shortcut: 'Tab',  onSelect: () => changeIndent(view, 2) },
       { type: 'item', label: 'Diminuir recuo', icon: OUTDENT, shortcut: 'Shift+Tab', onSelect: () => changeIndent(view, -2) },
       { type: 'separator' },
+      { type: 'item', label: 'Destacar', shortcut: '==', icon: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 11L2 14M4 10L7 7M9 6l3-3M6 12l5-5M3 9l5-5"/><rect x="8.5" y="0.5" width="5" height="5" rx="1" transform="rotate(45 11 3)"/></svg>`, onSelect: () => wrapSelection(view, '==') },
       { type: 'item', label: 'Comentário', icon: COMMENT, onSelect: addComment },
       { type: 'item', label: 'Formatar', icon: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><line x1="2" y1="4" x2="11" y2="4"/><line x1="2" y1="8" x2="14" y2="8"/><line x1="2" y1="12" x2="8" y2="12"/><polyline points="12 10 14 8 12 6"/></svg>`, onSelect: formatDocument },
     ];
@@ -530,7 +573,44 @@ export const EditorPane: React.FC<EditorPaneProps> = ({ onCommentsChange, onComm
     <div className="flex flex-col h-full overflow-hidden">
       <div className="px-4 py-1.5 border-b border-border flex items-center justify-between text-xs text-muted-foreground">
         <div className="flex items-center gap-1 min-w-0 flex-1">
-          <span className="truncate ml-2">{currentPath ?? 'Nenhuma página selecionada'}</span>
+          {renaming ? (
+            <input
+              autoFocus
+              value={renameDraft}
+              onChange={(e) => setRenameDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') void submitRename();
+                if (e.key === 'Escape') setRenaming(false);
+              }}
+              onBlur={() => void submitRename()}
+              onClick={(e) => e.stopPropagation()}
+              className="ml-2 flex-1 text-xs px-2 py-0.5 border border-primary bg-card text-foreground rounded outline-none"
+            />
+          ) : (
+            <>
+              <span className="truncate ml-2">{currentPath ?? 'Nenhuma página selecionada'}</span>
+              {currentPath && (
+                <div className="flex items-center gap-0.5 shrink-0">
+                  <button
+                    onClick={startRename}
+                    className="p-1 hover:bg-accent rounded text-muted-foreground hover:text-foreground transition-colors"
+                    title="Renomear"
+                    aria-label="Renomear"
+                  >
+                    <PencilIcon className="w-3 h-3" />
+                  </button>
+                  <button
+                    onClick={() => void handleDelete()}
+                    className="p-1 hover:bg-accent rounded text-muted-foreground hover:text-destructive transition-colors"
+                    title="Apagar"
+                    aria-label="Apagar"
+                  >
+                    <TrashIcon className="w-3 h-3" />
+                  </button>
+                </div>
+              )}
+            </>
+          )}
         </div>
         <div className="flex items-center gap-1 shrink-0">
           <button
@@ -609,7 +689,25 @@ export const EditorPane: React.FC<EditorPaneProps> = ({ onCommentsChange, onComm
           </button>
         </div>
       </div>
-      <div ref={hostRef} className="flex-1 overflow-auto relative" />
+      <div className="flex-1 overflow-auto relative">
+        <div ref={hostRef} className="absolute inset-0" />
+        {currentPath === null && (
+          <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-background/95 backdrop-blur-sm gap-4">
+            <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center">
+              <svg className="w-6 h-6 text-muted-foreground/50" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                <polyline points="14 2 14 8 20 8" />
+                <line x1="16" y1="13" x2="8" y2="13" />
+                <line x1="16" y1="17" x2="8" y2="17" />
+                <polyline points="10 9 9 9 8 9" />
+              </svg>
+            </div>
+            <p className="text-sm text-muted-foreground max-w-[220px] text-center leading-relaxed">
+              Selecione ou crie um arquivo para começar a editar
+            </p>
+          </div>
+        )}
+      </div>
 
       {menuPos && (
         <ContextMenu

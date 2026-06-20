@@ -52,4 +52,9 @@ export const registerVaultHandlers = (): void => {
     await VaultManager.rename(oldPath, newPath);
     return { success: true };
   });
+
+  ipcMain.handle(createChannel('vault', 'delete'), async (_e, relPath: string) => {
+    await VaultManager.deletePage(relPath);
+    return { success: true };
+  });
 };

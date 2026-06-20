@@ -113,6 +113,11 @@ class VaultManagerClass {
     await this.movePage(oldRelPath, newRelPath);
   }
 
+  async deletePage(relPath: string): Promise<void> {
+    const abs = this.resolve(relPath);
+    await fsp.rm(abs, { recursive: true, force: true });
+  }
+
   private startWatch(): void {
     if (!this.root) return;
     // eslint-disable-next-line import/no-named-as-default-member

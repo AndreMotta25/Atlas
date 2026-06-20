@@ -171,6 +171,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   const sessions = useChatStore((s) => s.sessions);
   const newConversation = useChatStore((s) => s.newConversation);
   const loadConversation = useChatStore((s) => s.loadConversation);
+  const deleteConversation = useChatStore((s) => s.deleteConversation);
 
   const [input, setInput] = useState('');
   const [sessionMenuOpen, setSessionMenuOpen] = useState(false);
@@ -246,26 +247,38 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                       <>
                         <div className="h-px bg-border my-1" />
                         {sessions.map((s) => (
-                          <button
+                          <div
                             key={s.id}
-                            onClick={() => { setSessionMenuOpen(false); void loadConversation(s.id); }}
-                            className={`w-full text-left px-3 py-1.5 hover:bg-accent flex items-center gap-2 ${
+                            className={`group flex items-center gap-2 px-3 py-1.5 hover:bg-accent ${
                               s.id === activeSession?.id ? 'bg-accent/50' : ''
                             }`}
                           >
-                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5 text-muted-foreground shrink-0">
-                              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-                            </svg>
-                            <div className="flex-1 min-w-0">
-                              <span className="text-xs text-foreground block truncate">
-                                {s.title ?? 'Sem título'}
-                              </span>
-                              <span className="text-[10px] text-muted-foreground">
-                                {relativeTime(s.updatedAt)}
-                                {typeof s.messageCount === 'number' ? ` · ${s.messageCount} msgs` : ''}
-                              </span>
-                            </div>
-                          </button>
+                            <button
+                              onClick={() => { setSessionMenuOpen(false); void loadConversation(s.id); }}
+                              className="flex items-center gap-2 flex-1 min-w-0 text-left"
+                            >
+                              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5 text-muted-foreground shrink-0">
+                                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                              </svg>
+                              <div className="min-w-0">
+                                <span className="text-xs text-foreground block truncate">
+                                  {s.title ?? 'Sem título'}
+                                </span>
+                                <span className="text-[10px] text-muted-foreground">
+                                  {relativeTime(s.updatedAt)}
+                                  {typeof s.messageCount === 'number' ? ` · ${s.messageCount} msgs` : ''}
+                                </span>
+                              </div>
+                            </button>
+                            <button
+                              onClick={() => { setSessionMenuOpen(false); void deleteConversation(s.id); }}
+                              className="p-1 hover:bg-background rounded text-muted-foreground hover:text-destructive transition-colors shrink-0 opacity-0 group-hover:opacity-100 focus-within:opacity-100"
+                              title="Apagar conversa"
+                              aria-label="Apagar conversa"
+                            >
+                              <TrashIcon className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
                         ))}
                       </>
                     )}
@@ -307,6 +320,20 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                   <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
                 </svg>
               </button>
+              {activeSession && !streaming && (
+                <button
+                  onClick={() => {
+                    if (window.confirm('Tem certeza que deseja apagar esta conversa?')) {
+                      void deleteConversation(activeSession.id);
+                    }
+                  }}
+                  className="p-1 hover:bg-accent rounded text-muted-foreground hover:text-destructive transition-colors"
+                  title="Apagar conversa"
+                  aria-label="Apagar conversa"
+                >
+                  <TrashIcon className="w-3.5 h-3.5" />
+                </button>
+              )}
               {messages.length > 2 && !streaming && (
                 <button
                   onClick={() => void compactConversation()}

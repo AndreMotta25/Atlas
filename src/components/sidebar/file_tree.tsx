@@ -315,6 +315,23 @@ export const FileTree: React.FC = () => {
     }
   };
 
+  const handleDelete = async () => {
+    if (!ctxMenu) return;
+    const path = ctxMenu.path;
+    setCtxMenu(null);
+    const name = path.split('/').pop() || path;
+    if (!window.confirm(`Tem certeza que deseja apagar "${name}"?`)) return;
+    try {
+      await api.vault.delete(path);
+      await loadTree();
+      if (currentPath === path || currentPath?.startsWith(path + '/')) {
+        useVaultStore.setState({ currentPath: null, currentContent: '', dirty: false });
+      }
+    } catch (err) {
+      console.error('Falha ao apagar:', err);
+    }
+  };
+
   const contextMenuItems: MenuEntry[] = ctxMenu
     ? [
         ...(ctxMenu.path.endsWith('.md')
@@ -332,6 +349,13 @@ export const FileTree: React.FC = () => {
           label: 'Renomear',
           icon: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4"><path d="M17 3a2.83 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>`,
           onSelect: startRename,
+        },
+        { type: 'separator' },
+        {
+          type: 'item',
+          label: 'Apagar',
+          icon: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>`,
+          onSelect: handleDelete,
         },
       ]
     : [];

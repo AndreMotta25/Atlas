@@ -26,6 +26,8 @@ export const DEFAULT_SYSTEM_PROMPT = [
   '· create_page({ path, content }) — cria página (REQUER CONFIRMAÇÃO).',
   '· edit_page({ path, mode, content, section? }) — edita página (REQUER CONFIRMAÇÃO).',
   '  modos: "replace" | "append" | "replace_section" (section = heading sem #).',
+  '· web_search({ query, maxResults? }) — pesquisa na web via Tavily. Exige API key configurada.',
+  '· web_extract({ urls }) — extrai conteúdo completo de até 5 URLs HTTP(S).',
   '',
   '══ USO DISCIPLINADO DE FERRAMENTAS ══',
   '1. search() SEMPRE antes de read_page(). Só chame read_page() quando souber',
@@ -35,6 +37,13 @@ export const DEFAULT_SYSTEM_PROMPT = [
   '3. Limite auto-imposto: no máximo 3 read_page() por turno. Se precisar de mais,',
   '   peça permissão ao usuário.',
   '4. get_backlinks() só quando a pergunta for sobre conexões/relações entre páginas.',
+  '5. PESQUISA WEB: prefira SEMPRE o vault (search/read_page) antes de web_search().',
+  '   Só use web_search() quando a resposta provavelmente NÃO está no vault:',
+  '   eventos recentes, dados externos, tópicos que você não domina.',
+  '6. Após web_search(), se 1-3 fontes forem claramente centrais, chame',
+  '   web_extract() nelas para conteúdo completo antes de gerar o documento.',
+  '7. Em documentos baseados em pesquisa web, cite fontes como [1], [2] ao longo',
+  '   do texto e liste-as no final com título + URL.',
   '',
   '══ RACIOCÍNIO VISÍVEL ══',
   'Percorra esta sequência mentalmente e mostre o passo em colchetes [ ] quando',
@@ -268,7 +277,7 @@ class AIOrchestratorClass {
               | undefined;
             sinks.toolResult?.({
               toolCallId: part.toolCallId,
-              toolName: part.toolName as PendingToolCall['toolName'] | 'read_page' | 'list_pages' | 'search' | 'get_backlinks',
+              toolName: part.toolName as PendingToolCall['toolName'] | 'read_page' | 'list_pages' | 'search' | 'get_backlinks' | 'web_search' | 'web_extract',
               success: Boolean(out?.success),
               path: typeof out?.path === 'string' ? out.path : undefined,
               content: this.summarizeToolOutput(part.toolName, out),
@@ -333,6 +342,45 @@ class AIOrchestratorClass {
       if (items.length === 0) return '(nenhum backlink)';
       return items
         .map((b) => `· ${b.fromTitle ? `${b.fromTitle} (${b.fromPath})` : b.fromPath}${b.anchor ? ` ← "${b.anchor}"` : ''}`)
+        .join('\n');
+    }
+    if (toolName === 'web_search') {
+      const query = typeof out.query === 'string' ? out.query : '';
+      const answer = typeof out.answer === 'string' && out.answer.trim() ? out.answer.trim() : null;
+      const results = Array.isArray(out.results)
+        ? (out.results as Array<{ title?: string; url?: string }>)
+        : [];
+      if (!results.length) return answer ?? '(sem resultados)';
+      const lines = results.slice(0, 5).map((r) => {
+        const host = (() => {
+          try {
+            return r.url ? new URL(r.url).host : '';
+          } catch {
+            return '';
+          }
+        })();
+        return `· ${r.title ?? host ?? r.url}${host ? ` — ${host}` : ''}`;
+      });
+      const head = query ? `Busca: "${query.slice(0, 80)}" → ${results.length} fontes` : `${results.length} fontes`;
+      return [head, ...(answer ? [`Resposta: ${answer.slice(0, 200)}`] : []), ...lines].join('\n');
+    }
+    if (toolName === 'web_extract') {
+      const results = Array.isArray(out.results)
+        ? (out.results as Array<{ url?: string; content?: string }>)
+        : [];
+      if (!results.length) return '(nenhuma página extraída)';
+      return results
+        .map((r) => {
+          const host = (() => {
+            try {
+              return r.url ? new URL(r.url).host : r.url ?? '';
+            } catch {
+              return r.url ?? '';
+            }
+          })();
+          const preview = r.content ? r.content.slice(0, 100).replace(/\s+/g, ' ') : '';
+          return `· ${host}${preview ? ` — ${preview}…` : ''}`;
+        })
         .join('\n');
     }
     return undefined;

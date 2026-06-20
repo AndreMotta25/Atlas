@@ -16,7 +16,7 @@
 [] - um icone de home que fica do lado do icone de pasta, o icone home tem que levar para a pagina home. - [facil]
 [] - Uma barra de pesquisa que fica no meio da tela no topo da pagina, na parte que ficam as opçoes do devtools do electron. - [medio]
 [x] - Quando selecionar o texto, as opçoes tem que aparecer automaticamente - [facil].
-[] - Tem que ser possivel mudar a cor de fundo do texto(sublinhar). - [facil]
+[x] - [Revisar] - Tem que ser possivel mudar a cor de fundo do texto(sublinhar). - [facil]
 [x] - Porque todo titulo fica com um underline em baixo - [facil].
 [x] - Verificar se o formatar markdown funciona corretamente. - [facil]
 [x] - Transformar o botão de comentario em toggle - [facil].
@@ -29,7 +29,9 @@
 [x] - coloque o "pensando" do atlas no header e se possivel anime isso para mostrar que ele está pensando mesmo porque ficando estatico parece que não está funcionando. O mesmo para a escrita.
 [x] - Deixe claro que o modelo deve sempre devolver um texto bem formatado.
 [] - Otimizar read_page: devolver só preview (500 chars) no ToolResultCard/estado/SQLite. O modelo continua recebendo conteúdo completo via tool-result. - [médio]
-[x] - Forçar o atlas a mostrar "botoes" para forçar a interação do usuário. Exemplo, pedi para trocar algo na pagina, o atlas fica esperando eu digitar sim, acho que é mais facil, aparecer um botão no chat com o texto "sim" ou algo dessa natureza.
-[] - Coloque um botão para apagar uma pagina/pasta
-[] - Coloque um botão para apagar a conversa do chat.
+[x] - [Revisar] - Forçar o atlas a mostrar "botoes" para forçar a interação do usuário. Exemplo, pedi para trocar algo na pagina, o atlas fica esperando eu digitar sim, acho que é mais facil, aparecer um botão no chat com o texto "sim" ou algo dessa natureza.
+[x] - Coloque um botão para apagar uma pagina/pasta
+[x] - Coloque um botão para apagar a conversa do chat.
 [x] - revisar o prompt do atlas com o glm 5.2
+[ ] - Quando iniciar a aplicação o editor deve estar bloqueado até que um arquivo seja criado ou selecionado(aberto).
+[x] - Permitir que o modelo faça buscas na internet

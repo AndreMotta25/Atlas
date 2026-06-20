@@ -31,6 +31,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
   const [hasKey, setHasKey] = useState<boolean | null>(null);
   const [statusMsg, setStatusMsg] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [tavilyKeyDraft, setTavilyKeyDraft] = useState('');
+  const [hasTavilyKey, setHasTavilyKey] = useState<boolean | null>(null);
+  const [tavilyStatusMsg, setTavilyStatusMsg] = useState<string | null>(null);
+  const [tavilyErrorMsg, setTavilyErrorMsg] = useState<string | null>(null);
   const [confirmVault, setConfirmVault] = useState(false);
   const [promptDraft, setPromptDraft] = useState(settings.systemPrompt ?? '');
   const [defaultPrompt, setDefaultPrompt] = useState<string | null>(null);
@@ -40,6 +44,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
   useEffect(() => {
     void api.settings.hasApiKey(settings.activeProvider).then(setHasKey);
   }, [settings.activeProvider]);
+
+  // Probe Tavily key status on mount.
+  useEffect(() => {
+    void api.settings.hasApiKey('tavily').then(setHasTavilyKey);
+  }, []);
 
   // Load default prompt for placeholder display.
   useEffect(() => {
@@ -110,6 +119,34 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
     await deleteApiKey(settings.activeProvider);
     await refreshKeyStatus();
     setStatusMsg('API key removida.');
+  };
+
+  const refreshTavilyKeyStatus = async () => {
+    const has = await api.settings.hasApiKey('tavily');
+    setHasTavilyKey(has);
+  };
+
+  const handleSaveTavilyKey = async () => {
+    setTavilyErrorMsg(null);
+    setTavilyStatusMsg(null);
+    if (!tavilyKeyDraft.trim()) {
+      setTavilyErrorMsg('Cole uma API key válida.');
+      return;
+    }
+    const ok = await setApiKey('tavily', tavilyKeyDraft.trim());
+    if (ok) {
+      setTavilyStatusMsg('Tavily key salva com segurança (safeStorage).');
+      setTavilyKeyDraft('');
+      await refreshTavilyKeyStatus();
+    } else {
+      setTavilyErrorMsg('Falha ao salvar — criptografia indisponível neste sistema.');
+    }
+  };
+
+  const handleDeleteTavilyKey = async () => {
+    await deleteApiKey('tavily');
+    await refreshTavilyKeyStatus();
+    setTavilyStatusMsg('Tavily key removida.');
   };
 
   const handleChangeVault = async () => {
@@ -305,6 +342,49 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
             </div>
             {statusMsg && <p className="text-xs text-success mt-2">{statusMsg}</p>}
             {errorMsg && <p className="text-xs text-destructive mt-2">{errorMsg}</p>}
+          </section>
+
+          {/* Tavily (pesquisa web) */}
+          <section>
+            <h3 className="text-sm font-semibold text-foreground mb-1">
+              Tavily — pesquisa web
+            </h3>
+            <p className="text-xs text-muted-foreground mb-2">
+              Habilita a tool <code className="font-mono text-[11px]">web_search</code> para o
+              Atlas pesquisar na internet ao gerar documentos. Independente do provider ativo.
+            </p>
+            <p className="text-xs text-muted-foreground mb-2">
+              {hasTavilyKey === null
+                ? 'verificando…'
+                : hasTavilyKey
+                ? <span className="flex items-center gap-1"><SuccessIcon className="w-3.5 h-3.5 text-success" /> já configurada (criptografada com safeStorage).</span>
+                : <span className="flex items-center gap-1"><WarningIcon className="w-3.5 h-3.5 text-warning" /> nenhuma key configurada — pesquisa web desativada.</span>}
+            </p>
+            <div className="flex gap-2">
+              <input
+                type="password"
+                value={tavilyKeyDraft}
+                onChange={(e) => setTavilyKeyDraft(e.target.value)}
+                placeholder="tvly-…"
+                className="flex-1 text-sm px-2 py-1 border border-input bg-card text-foreground rounded"
+              />
+              <button
+                onClick={handleSaveTavilyKey}
+                className="px-3 py-1 bg-primary text-primary-foreground rounded text-sm hover:brightness-90"
+              >
+                Salvar
+              </button>
+              {hasTavilyKey && (
+                <button
+                  onClick={handleDeleteTavilyKey}
+                  className="px-3 py-1 bg-destructive/20 text-destructive rounded text-sm hover:bg-destructive/30"
+                >
+                  Remover
+                </button>
+              )}
+            </div>
+            {tavilyStatusMsg && <p className="text-xs text-success mt-2">{tavilyStatusMsg}</p>}
+            {tavilyErrorMsg && <p className="text-xs text-destructive mt-2">{tavilyErrorMsg}</p>}
           </section>
         </div>
 
