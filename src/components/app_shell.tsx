@@ -40,7 +40,6 @@ export const AppShell: React.FC = () => {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [sidebarWidth, setSidebarWidth] = useState(260);
   const [chatWidth, setChatWidth] = useState(380);
-  const [chatVisible, setChatVisible] = useState(true);
   const [sidebarVisible, setSidebarVisible] = useState(true);
   const [activeActivity, setActiveActivity] = useState<ActivityId>('projects');
 
@@ -53,6 +52,21 @@ export const AppShell: React.FC = () => {
   const [comments, setComments] = useState<CommentEntry[]>([]);
   const [commentIndex, setCommentIndex] = useState(0);
   const [chatTab, setChatTab] = useState<'chat' | 'comments'>('chat');
+
+  // Chat display mode: 'panel' = side panel, 'bubble' = minimized ball,
+  // 'overlay' = detached full-screen modal floating over the editor.
+  type ChatMode = 'panel' | 'bubble' | 'overlay';
+  const [chatMode, setChatMode] = useState<ChatMode>('panel');
+
+  // Close the overlay with Esc.
+  useEffect(() => {
+    if (chatMode !== 'overlay') return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setChatMode('panel');
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [chatMode]);
 
   // Search state
   const [searchQuery, setSearchQuery] = useState('');
@@ -485,9 +499,9 @@ export const AppShell: React.FC = () => {
         />
       </main>
 
-      {chatVisible && <ResizeHandle onStart={() => { resizeRef.current = 'chat'; }} />}
+      {chatMode === 'panel' && <ResizeHandle onStart={() => { resizeRef.current = 'chat'; }} />}
 
-      {chatVisible ? (
+      {chatMode === 'panel' ? (
         <aside className="border-l border-border overflow-hidden" style={{ width: chatWidth, minWidth: MIN_CHAT }}>
           <ChatPanel
             chatTab={chatTab}
@@ -497,12 +511,13 @@ export const AppShell: React.FC = () => {
             onCommentIndexChange={setCommentIndex}
             onDeleteComment={handleDeleteComment}
             onUpdateComment={handleUpdateComment}
-            onToggleChat={() => setChatVisible(false)}
+            onToggleChat={() => setChatMode('bubble')}
+            onDetach={() => setChatMode('overlay')}
           />
         </aside>
-      ) : (
+      ) : chatMode === 'bubble' ? (
         <button
-          onClick={() => setChatVisible(true)}
+          onClick={() => setChatMode('panel')}
           className="fixed bottom-6 right-6 z-50 w-14 h-14 rounded-full bg-primary text-primary-foreground shadow-lg hover:shadow-xl hover:brightness-110 btn-press flex items-center justify-center group"
           title="Abrir Atlas"
           aria-label="Abrir chat do Atlas"
@@ -515,6 +530,30 @@ export const AppShell: React.FC = () => {
             </span>
           )}
         </button>
+      ) : null}
+
+      {chatMode === 'overlay' && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-8 bg-black/50 backdrop-blur-sm animate-scale-in"
+          onClick={() => setChatMode('panel')}
+        >
+          <div
+            className="relative w-full max-w-3xl h-[85vh] bg-card border border-border rounded-2xl shadow-2xl overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <ChatPanel
+              chatTab={chatTab}
+              onSetTab={setChatTab}
+              comments={comments}
+              commentIndex={commentIndex}
+              onCommentIndexChange={setCommentIndex}
+              onDeleteComment={handleDeleteComment}
+              onUpdateComment={handleUpdateComment}
+              onToggleChat={() => setChatMode('panel')}
+              showInput
+            />
+          </div>
+        </div>
       )}
 
       {settingsOpen && <SettingsModal onClose={() => setSettingsOpen(false)} />}

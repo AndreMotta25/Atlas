@@ -149,6 +149,11 @@ interface ChatPanelProps {
   onDeleteComment: (index: number) => void;
   onUpdateComment: (index: number, newComment: string) => void;
   onToggleChat?: () => void;
+  /** Detach the panel into a full-screen floating overlay. */
+  onDetach?: () => void;
+  /** Render an inline message composer at the bottom (used in overlay mode
+   *  where the editor's floating input is hidden underneath). */
+  showInput?: boolean;
 }
 
 export const ChatPanel: React.FC<ChatPanelProps> = ({
@@ -160,6 +165,8 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   onDeleteComment,
   onUpdateComment,
   onToggleChat,
+  onDetach,
+  showInput,
 }) => {
   const messages = useChatStore((s) => s.messages);
   const streaming = useChatStore((s) => s.streaming);
@@ -175,6 +182,25 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   const newConversation = useChatStore((s) => s.newConversation);
   const loadConversation = useChatStore((s) => s.loadConversation);
   const deleteConversation = useChatStore((s) => s.deleteConversation);
+  const sendChat = useChatStore((s) => s.send);
+  const cancelChat = useChatStore((s) => s.cancel);
+
+  const [chatInput, setChatInput] = useState('');
+
+  const handleChatSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const text = chatInput.trim();
+    if (!text || streaming) return;
+    setChatInput('');
+    void sendChat(text);
+  };
+
+  const handleChatKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleChatSubmit(e as unknown as React.FormEvent);
+    }
+  };
 
   const [sessionMenuOpen, setSessionMenuOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement | null>(null);
@@ -331,6 +357,20 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                   <CompressIcon className="w-3.5 h-3.5" />
                 </button>
               )}
+              {onDetach && (
+                <button
+                  onClick={onDetach}
+                  className="p-1 hover:bg-accent rounded text-muted-foreground hover:text-foreground transition-colors"
+                  title="Desprender para modo flutuante"
+                  aria-label="Desprender para modo flutuante"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5">
+                    <path d="M15 3h6v6" />
+                    <path d="M10 14L21 3" />
+                    <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                  </svg>
+                </button>
+              )}
               {onToggleChat && (
                 <button
                   onClick={onToggleChat}
@@ -403,6 +443,41 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                 </div>
               ))}
             </div>
+          )}
+
+          {/* Inline composer — shown in overlay mode where the editor's
+              floating input is hidden underneath the modal. */}
+          {showInput && (
+            <form
+              onSubmit={handleChatSubmit}
+              className="shrink-0 flex gap-2 p-3 border-t border-border bg-background"
+            >
+              <textarea
+                value={chatInput}
+                onChange={(e) => setChatInput(e.target.value)}
+                onKeyDown={handleChatKeyDown}
+                placeholder="Escreva uma mensagem…"
+                rows={2}
+                className="flex-1 resize-none text-sm px-3 py-2 border border-input bg-card text-foreground rounded-xl focus:outline-none focus:border-primary placeholder:text-muted-foreground/60"
+              />
+              {streaming ? (
+                <button
+                  type="button"
+                  onClick={() => void cancelChat()}
+                  className="px-4 py-2 bg-destructive/10 text-destructive rounded-xl text-sm font-medium hover:bg-destructive/20 transition-colors shrink-0"
+                >
+                  Parar
+                </button>
+              ) : (
+                <button
+                  type="submit"
+                  disabled={!chatInput.trim()}
+                  className="px-4 py-2 bg-primary text-primary-foreground rounded-xl text-sm font-medium hover:brightness-90 disabled:opacity-40 disabled:cursor-not-allowed transition-all shrink-0"
+                >
+                  Enviar
+                </button>
+              )}
+            </form>
           )}
 
         </>
