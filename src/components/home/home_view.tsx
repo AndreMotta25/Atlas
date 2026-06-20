@@ -3,6 +3,7 @@ import { useChatStore } from '../../stores/chat_store';
 import { useVaultStore } from '../../stores/vault_store';
 import { Message } from '../chat/message';
 import { ThinkingIndicator } from '../thinking_indicator';
+import { SendButton } from '../send_button';
 import type { ChatSession, VaultTree } from '../../types';
 
 const SUGGESTIONS = [
@@ -138,18 +139,7 @@ export const HomeView: React.FC = () => {
           Parar
         </button>
       ) : (
-        <button
-          type="submit"
-          disabled={!input.trim()}
-          className="shrink-0 w-9 h-9 flex items-center justify-center bg-primary text-primary-foreground rounded-xl hover:brightness-90 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
-          title="Enviar"
-          aria-label="Enviar"
-        >
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
-            <line x1="22" y1="2" x2="11" y2="13" />
-            <polygon points="22 2 15 22 11 13 2 9 22 2" />
-          </svg>
-        </button>
+        <SendButton disabled={!input.trim()} loading={streaming} />
       )}
     </form>
   );

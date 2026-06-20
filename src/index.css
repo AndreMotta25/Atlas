@@ -657,6 +657,32 @@ input {
   transform: scale(0.96);
 }
 
+/* ── Send button glow ──────────────────────────────────────────── */
+
+.send-glow {
+  box-shadow: 0px 0px 20px color-mix(in srgb, var(--color-primary) 30%, transparent);
+  transition: box-shadow 0.3s ease, transform 0.2s ease, background-color 0.3s ease;
+}
+
+.send-glow:hover:not(:disabled) {
+  box-shadow: 0px 0px 35px color-mix(in srgb, var(--color-primary) 50%, transparent);
+  transform: scale(1.02);
+}
+
+.send-glow:active:not(:disabled) {
+  transform: scale(0.95);
+  box-shadow: 0px 0px 10px color-mix(in srgb, var(--color-primary) 40%, transparent);
+}
+
+@keyframes pulse-opacity {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+.animate-pulse-opacity {
+  animation: pulse-opacity 1.5s infinite ease-in-out;
+}
+
 /* ── Chat messages ─────────────────────────────────────────────── */
 
 .chat-message-enter {

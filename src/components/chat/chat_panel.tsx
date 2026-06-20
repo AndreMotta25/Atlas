@@ -7,6 +7,7 @@ import {
   CompressIcon, Minus, ChatIcon, ChevronLeft, ChevronRight, CommentEmptyIcon, CloseIcon, FileIcon, HighlighterIcon,
 } from '../icons';
 import { ThinkingIndicator } from '../thinking_indicator';
+import { SendButton } from '../send_button';
 import { HIGHLIGHT_COLORS } from '../../types';
 
 /** Format a timestamp as a relative time string (pt-BR). */
@@ -458,13 +459,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                   Parar
                 </button>
               ) : (
-                <button
-                  type="submit"
-                  disabled={!chatInput.trim()}
-                  className="px-4 py-2 bg-primary text-primary-foreground rounded-xl text-sm font-medium hover:brightness-90 disabled:opacity-40 disabled:cursor-not-allowed transition-all shrink-0"
-                >
-                  Enviar
-                </button>
+                <SendButton disabled={!chatInput.trim()} loading={streaming} />
               )}
             </form>
           )}

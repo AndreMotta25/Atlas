@@ -276,6 +276,12 @@ export const HomeIcon: React.FC<IconProps> = ({ className = 'w-5 h-5' }) => (
 
 // ─── Simple spinner for loading states ─────────────────────────────
 
+export const BoltIcon: React.FC<IconProps> = ({ className = 'w-4 h-4' }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+  </svg>
+);
+
 export const LoadingSpinner: React.FC<IconProps> = ({ className = 'w-6 h-6' }) => (
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`${className} animate-spin`}>
     <path d="M21 12a9 9 0 1 1-6.219-8.56" />
