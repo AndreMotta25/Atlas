@@ -128,6 +128,8 @@ const electronAPI = {
       ipcRenderer.invoke(createChannel('settings', 'get-api-key'), provider),
     deleteApiKey: (provider: AIProvider): Promise<{ success: boolean }> =>
       ipcRenderer.invoke(createChannel('settings', 'delete-api-key'), provider),
+    listModels: (provider: AIProvider): Promise<{ models: string[]; error?: string }> =>
+      ipcRenderer.invoke(createChannel('settings', 'list-models'), provider),
   },
 
   // ── AI ──

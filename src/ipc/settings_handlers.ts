@@ -5,6 +5,14 @@ import { SecureStore } from '../vault/secure_store';
 import { DEFAULT_SYSTEM_PROMPT } from '../ai/orchestrator';
 import type { AIProvider, AppSettings } from '../types';
 
+/**
+ * OpenAI-compatible /models endpoints per provider.
+ * Only providers that implement this listing API should appear here.
+ */
+const MODELS_ENDPOINTS: Partial<Record<AIProvider, string>> = {
+  deepseek: 'https://api.deepseek.com/models',
+};
+
 export const registerSettingsHandlers = (): void => {
   ipcMain.handle(createChannel('settings', 'get'), async () => ConfigStore.load());
 
@@ -45,5 +53,30 @@ export const registerSettingsHandlers = (): void => {
   ipcMain.handle(createChannel('settings', 'delete-api-key'), async (_e, provider: AIProvider) => {
     SecureStore.deleteApiKey(provider);
     return { success: true };
+  });
+
+  ipcMain.handle(createChannel('settings', 'list-models'), async (_e, provider: AIProvider) => {
+    const url = MODELS_ENDPOINTS[provider];
+    if (!url) {
+      return { models: [] as string[], error: `Listagem de modelos não suportada para "${provider}".` };
+    }
+    const key = SecureStore.getApiKey(provider);
+    if (!key) {
+      return { models: [] as string[], error: 'Nenhuma API key configurada para este provider.' };
+    }
+    try {
+      const res = await fetch(url, {
+        method: 'GET',
+        headers: { Authorization: `Bearer ${key}` },
+      });
+      if (!res.ok) {
+        return { models: [], error: `HTTP ${res.status} ${res.statusText}` };
+      }
+      const json = (await res.json()) as { data?: Array<{ id: string }> };
+      const models = Array.isArray(json.data) ? json.data.map((m) => m.id).filter(Boolean) : [];
+      return { models };
+    } catch (err) {
+      return { models: [], error: (err as Error).message };
+    }
   });
 };

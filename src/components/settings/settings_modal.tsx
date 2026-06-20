@@ -40,10 +40,39 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
   const [defaultPrompt, setDefaultPrompt] = useState<string | null>(null);
   const [promptSaved, setPromptSaved] = useState(false);
 
+  // Model list fetched from the provider's /models endpoint.
+  const [modelList, setModelList] = useState<string[] | null>(null);
+  const [modelsLoading, setModelsLoading] = useState(false);
+  const [modelsError, setModelsError] = useState<string | null>(null);
+
   // Probe current key status for the active provider on mount.
   useEffect(() => {
     void api.settings.hasApiKey(settings.activeProvider).then(setHasKey);
   }, [settings.activeProvider]);
+
+  // Fetch the provider's model list whenever the provider or key status changes.
+  useEffect(() => {
+    let cancelled = false;
+    const run = async () => {
+      if (hasKey !== true) {
+        setModelList(null);
+        setModelsError(null);
+        return;
+      }
+      setModelsLoading(true);
+      setModelsError(null);
+      try {
+        const result = await api.settings.listModels(settings.activeProvider);
+        if (cancelled) return;
+        setModelList(result.models);
+        setModelsError(result.error ?? null);
+      } finally {
+        if (!cancelled) setModelsLoading(false);
+      }
+    };
+    void run();
+    return () => { cancelled = true; };
+  }, [settings.activeProvider, hasKey]);
 
   // Probe Tavily key status on mount.
   useEffect(() => {
@@ -255,15 +284,43 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
             <label className="block text-sm font-semibold text-foreground mb-1">
               Modelo padrão
             </label>
-            <input
-              type="text"
-              value={settings.defaultModel}
-              onChange={(e) => void handleModelChange(e.target.value)}
-              placeholder={
-                PROVIDERS.find((p) => p.id === settings.activeProvider)?.modelPlaceholder
-              }
-              className="w-full text-sm px-2 py-1 border border-input bg-card text-foreground rounded"
-            />
+            {modelList && modelList.length > 0 ? (
+              <select
+                value={settings.defaultModel}
+                onChange={(e) => void handleModelChange(e.target.value)}
+                className="w-full text-sm px-2 py-1 border border-input bg-card text-foreground rounded focus:outline-none focus:border-primary transition-colors"
+              >
+                {!modelList.includes(settings.defaultModel) && settings.defaultModel && (
+                  <option value={settings.defaultModel}>
+                    {settings.defaultModel} (fora da lista)
+                  </option>
+                )}
+                {modelList.map((m) => (
+                  <option key={m} value={m}>{m}</option>
+                ))}
+              </select>
+            ) : (
+              <>
+                <input
+                  type="text"
+                  value={settings.defaultModel}
+                  onChange={(e) => void handleModelChange(e.target.value)}
+                  placeholder={
+                    PROVIDERS.find((p) => p.id === settings.activeProvider)?.modelPlaceholder
+                  }
+                  className="w-full text-sm px-2 py-1 border border-input bg-card text-foreground rounded"
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  {modelsLoading
+                    ? 'Carregando modelos do provider…'
+                    : modelsError
+                    ? `Não foi possível listar modelos: ${modelsError}. Digite manualmente.`
+                    : hasKey === false
+                    ? 'Configure uma API key para escolher da lista.'
+                    : ''}
+                </p>
+              </>
+            )}
           </section>
 
           {/* System Prompt */}
