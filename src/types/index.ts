@@ -198,19 +198,6 @@ export const HIGHLIGHT_COLORS = [
 export type HighlightColor = (typeof HIGHLIGHT_COLORS)[number]['value'];
 export const DEFAULT_HIGHLIGHT_COLOR: HighlightColor = 'yellow';
 
-/** Parse the content of a <!--c:...--> annotation.
- *  Format: comment|color  (e.g. "my note|green" or "|blue" for color-only).
- *  Backwards-compatible: plain "comment" → default yellow. */
-export function parseCommentAnnotation(raw: string): { comment: string; color: string } {
-  const pipe = raw.lastIndexOf('|');
-  if (pipe === -1) return { comment: raw, color: 'yellow' };
-  const maybeColor = raw.slice(pipe + 1);
-  if (/^[a-z]+$/.test(maybeColor)) {
-    return { comment: raw.slice(0, pipe), color: maybeColor };
-  }
-  return { comment: raw, color: 'yellow' };
-}
-
 // ─── Settings Types ─────────────────────────────────────────────
 export interface AppSettings {
   vaultPath: string | null;

@@ -9,6 +9,7 @@ import {
 } from '@codemirror/view';
 import { syntaxTree } from '@codemirror/language';
 import type { SyntaxNode, SyntaxNodeRef } from '@lezer/common';
+import { parseAnnotation } from './comment_parser';
 
 /**
  * Live Preview para o editor Atlas.
@@ -276,21 +277,11 @@ function decorateWikiLinksAndTags(view: EditorView, decos: Range<Decoration>[]) 
 
 // ─── Highlights & comments (regex pass) ──────────────────────────
 
-const HIGHLIGHT_RE = /==([^=]+)==/g;
-
-/** Parse the content of a <!--c:...--> annotation.
- *  Format: comment|color  (e.g. "my note|green" or "|blue" for color-only).
- *  Backwards-compatible: plain "comment" → yellow. */
-function parseCommentAnnotation(raw: string): { comment: string; color: string } {
-  const pipe = raw.lastIndexOf('|');
-  if (pipe === -1) return { comment: raw, color: 'yellow' };
-  const maybeColor = raw.slice(pipe + 1);
-  // Only treat as color if it looks like a known color name (no spaces, common chars).
-  if (/^[a-z]+$/.test(maybeColor)) {
-    return { comment: raw.slice(0, pipe), color: maybeColor };
-  }
-  return { comment: raw, color: 'yellow' };
-}
+// `[\s\S]+?` (instead of `[^=]+`) allows `=` and newlines inside highlights.
+const HIGHLIGHT_RE = /==([\s\S]+?)==/g;
+// `[\s\S]+?` allows multi-line annotations (encoded comments may wrap lines).
+// The `^` anchor ensures the annotation is *adjacent* to the highlight.
+const ANNOTATION_RE = /^<!--c:([\s\S]+?)-->/;
 
 function decorateHighlightsAndComments(view: EditorView, decos: Range<Decoration>[]) {
   const state = view.state;
@@ -307,15 +298,19 @@ function decorateHighlightsAndComments(view: EditorView, decos: Range<Decoration
       const contentStart = fullStart + 2; // after ==
       const contentEnd = fullEnd - 2;     // before ==
 
-      // Look for comment annotation right after the highlight
-      const after = state.doc.sliceString(fullEnd, Math.min(fullEnd + 50, state.doc.length));
-      const cm = /^<!--c:(.+?)-->/.exec(after);
+      // Look for comment annotation right after the highlight. The window
+      // must be large enough to fit the longest encoded annotation.
+      const after = state.doc.sliceString(fullEnd, Math.min(fullEnd + 200, state.doc.length));
+      const cm = ANNOTATION_RE.exec(after);
       let color = 'yellow';
       if (cm) {
-        const parsed = parseCommentAnnotation(cm[1]);
+        const parsed = parseAnnotation(cm[1]);
         color = parsed.color;
-        // Hide the comment markup
-        hideRangeMark(fullEnd, fullEnd + cm[0].length, decos);
+        // Hide the comment markup. The annotation is plain text in a
+        // paragraph (not inside any syntax-tree node), so Decoration.replace
+        // is safe here and avoids the hit-testing issues that mark-based
+        // hiding causes for clicks/selections AFTER the annotation.
+        hideRange(fullEnd, fullEnd + cm[0].length, decos);
       }
 
       // Hide the == marks (use mark-based hiding to avoid DOM↔doc mapping issues)
@@ -350,15 +345,6 @@ function decorateAsideBlocks(view: EditorView, decos: Range<Decoration>[]) {
       safeMark('atlas-aside', innerStart, innerEnd, decos);
     }
   }
-}
-
-/** Find a comment adjacent to a position (looks forward up to 50 chars). */
-export function findCommentAt(state: { doc: { sliceString: (from: number, to: number) => string }; length: number }, pos: number): string | null {
-  const slice = state.doc.sliceString(pos, Math.min(pos + 50, state.length));
-  const m = /^<!--c:(.+?)-->/.exec(slice);
-  if (!m) return null;
-  const parsed = parseCommentAnnotation(m[1]);
-  return parsed.comment.trim() || null;
 }
 
 // ─── Main builder ────────────────────────────────────────────────

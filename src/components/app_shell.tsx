@@ -10,19 +10,14 @@ import { useChatStore } from '../stores/chat_store';
 import { useTheme } from '../hooks/use_theme';
 import { useFont } from '../hooks/use_font';
 import { api } from '../lib/api';
-import type { ChatSearchResult } from '../types';
 import {
-  MenuHamburger, SearchIcon, SpinnerIcon, CloseIcon, FileIcon, FolderPlus,
-  GearIcon, ChatIcon, SearchEmptyIcon, ClockIcon, SuccessIcon,
+  SearchIcon, SpinnerIcon, CloseIcon, FileIcon, FolderPlus, PlusIcon,
+  GearIcon, SearchEmptyIcon, ClockIcon, SuccessIcon,
   ChevronLeft, ChevronRight,
 } from './icons';
 
-export interface CommentEntry {
-  pos: number;
-  text: string;
-  comment: string;
-  color: string;
-}
+import type { CommentEntry } from './editor/comment_parser';
+export type { CommentEntry };
 
 const MIN_SIDEBAR = 180;
 const MIN_CHAT = 260;
@@ -43,8 +38,6 @@ export const AppShell: React.FC = () => {
   const subscribeWatch = useVaultStore((s) => s.subscribeWatch);
   const initChat = useChatStore((s) => s.init);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [menuOpen, setMenuOpen] = useState(false);
-
   const [sidebarWidth, setSidebarWidth] = useState(260);
   const [chatWidth, setChatWidth] = useState(380);
   const [chatVisible, setChatVisible] = useState(true);
@@ -52,9 +45,9 @@ export const AppShell: React.FC = () => {
   const [activeActivity, setActiveActivity] = useState<ActivityId>('projects');
 
   const resizeRef = useRef<'sidebar' | 'chat' | null>(null);
-  const menuRef = useRef<HTMLDivElement | null>(null);
   const deleteCommentRef = useRef<((index: number) => void) | null>(null);
   const updateCommentRef = useRef<((index: number, newComment: string) => void) | null>(null);
+  const scrollToCommentRef = useRef<((index: number) => void) | null>(null);
 
   // Comment coordination
   const [comments, setComments] = useState<CommentEntry[]>([]);
@@ -65,7 +58,6 @@ export const AppShell: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [searching, setSearching] = useState(false);
   const [pageResults, setPageResults] = useState<Array<{ path: string; reason: string }> | null>(null);
-  const [chatResults, setChatResults] = useState<ChatSearchResult[] | null>(null);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
 
   useTheme();
@@ -80,18 +72,6 @@ export const AppShell: React.FC = () => {
       unsubscribeChat();
     };
   }, [loadTree, subscribeWatch, initChat]);
-
-  // Close menu on outside click
-  useEffect(() => {
-    if (!menuOpen) return;
-    const handle = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setMenuOpen(false);
-      }
-    };
-    window.addEventListener('mousedown', handle);
-    return () => window.removeEventListener('mousedown', handle);
-  }, [menuOpen]);
 
   const onMouseMove = useCallback((e: MouseEvent) => {
     if (!resizeRef.current) return;
@@ -116,7 +96,6 @@ export const AppShell: React.FC = () => {
   }, [onMouseMove, onMouseUp]);
 
   const handleNewPage = async () => {
-    setMenuOpen(false);
     const base = 'sem-titulo';
     let n = 1;
     let rel = `${base}.md`;
@@ -135,7 +114,6 @@ export const AppShell: React.FC = () => {
   };
 
   const handleNewFolder = async () => {
-    setMenuOpen(false);
     const base = 'nova-pasta';
     let n = 1;
     let rel = base;
@@ -155,6 +133,7 @@ export const AppShell: React.FC = () => {
   const handleCommentSelect = (index: number) => {
     setCommentIndex(index);
     setChatTab('comments');
+    scrollToCommentRef.current?.(index);
   };
 
   const handleDeleteComment = (index: number) => {
@@ -170,18 +149,11 @@ export const AppShell: React.FC = () => {
     if (!q || searching) return;
     setSearching(true);
     setPageResults(null);
-    setChatResults(null);
     try {
-      // Run both FTS5 searches in parallel — pages + chat messages.
-      const [pages, messages] = await Promise.all([
-        api.vault.search(q).catch((): Awaited<ReturnType<typeof api.vault.search>> => []),
-        api.chat.searchMessages(q).catch((): Awaited<ReturnType<typeof api.chat.searchMessages>> => []),
-      ]);
+      const pages = await api.vault.search(q).catch((): Awaited<ReturnType<typeof api.vault.search>> => []);
       setPageResults(pages.map((r) => ({ path: r.path, reason: r.snippet })));
-      setChatResults(messages);
     } catch {
       setPageResults([]);
-      setChatResults([]);
     } finally {
       setSearching(false);
     }
@@ -192,13 +164,11 @@ export const AppShell: React.FC = () => {
     await openPage(path);
   };
 
-  const handleOpenChatResult = async (sessionId: string) => {
-    clearSearch();
-    setChatTab('chat');
-    await useChatStore.getState().loadConversation(sessionId);
-  };
-
   const handleActivityChange = (id: ActivityId) => {
+    if (id === 'settings') {
+      setSettingsOpen(true);
+      return;
+    }
     if (id === activeActivity) {
       // Toggle sidebar off when clicking the active icon (VS Code behavior)
       setSidebarVisible((v) => !v);
@@ -215,13 +185,10 @@ export const AppShell: React.FC = () => {
   const clearSearch = () => {
     setSearchQuery('');
     setPageResults(null);
-    setChatResults(null);
   };
 
-  const hasResults =
-    (pageResults !== null && pageResults.length > 0) ||
-    (chatResults !== null && chatResults.length > 0);
-  const showingResults = pageResults !== null || chatResults !== null;
+  const hasResults = pageResults !== null && pageResults.length > 0;
+  const showingResults = pageResults !== null;
 
   const renderActivityView = () => {
     switch (activeActivity) {
@@ -231,10 +198,26 @@ export const AppShell: React.FC = () => {
             {/* Sidebar header */}
             <div className="px-2 py-1.5 border-b border-border space-y-1">
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-1">
-                  <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                    Projetos
-                  </span>
+                <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  Projetos
+                </span>
+                <div className="flex items-center gap-0.5">
+                  <button
+                    onClick={handleNewPage}
+                    className="p-1 hover:bg-accent rounded text-muted-foreground hover:text-foreground transition-colors"
+                    title="Nova página"
+                    aria-label="Nova página"
+                  >
+                    <PlusIcon className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={handleNewFolder}
+                    className="p-1 hover:bg-accent rounded text-muted-foreground hover:text-foreground transition-colors"
+                    title="Nova pasta"
+                    aria-label="Nova pasta"
+                  >
+                    <FolderPlus className="w-4 h-4" />
+                  </button>
                   <button
                     onClick={() => setSidebarVisible(false)}
                     className="p-1 hover:bg-accent rounded text-muted-foreground hover:text-foreground transition-colors"
@@ -243,42 +226,6 @@ export const AppShell: React.FC = () => {
                   >
                     <ChevronLeft className="w-3.5 h-3.5" />
                   </button>
-                </div>
-                <div ref={menuRef} className="relative">
-                  <button
-                    onClick={() => setMenuOpen((o) => !o)}
-                    className="p-1 hover:bg-accent rounded text-muted-foreground hover:text-foreground transition-colors"
-                    title="Menu"
-                    aria-label="Menu"
-                  >
-                    <MenuHamburger />
-                  </button>
-                  {menuOpen && (
-                    <div className="absolute right-0 top-full mt-1 z-50 min-w-[180px] bg-card border border-border rounded-lg shadow-lg py-1 text-sm animate-scale-in">
-                      <button
-                        onClick={handleNewPage}
-                        className="w-full text-left px-3 py-1.5 hover:bg-accent flex items-center gap-2.5"
-                      >
-                        <FileIcon className="w-4 h-4 text-muted-foreground shrink-0" />
-                        Nova página
-                      </button>
-                      <button
-                        onClick={handleNewFolder}
-                        className="w-full text-left px-3 py-1.5 hover:bg-accent flex items-center gap-2.5"
-                      >
-                        <FolderPlus className="w-4 h-4 text-muted-foreground shrink-0" />
-                        Nova pasta
-                      </button>
-                      <div className="h-px bg-border my-1" />
-                      <button
-                        onClick={() => { setMenuOpen(false); setSettingsOpen(true); }}
-                        className="w-full text-left px-3 py-1.5 hover:bg-accent flex items-center gap-2.5"
-                      >
-                        <GearIcon className="w-4 h-4 text-muted-foreground shrink-0" />
-                        Configurações
-                      </button>
-                    </div>
-                  )}
                 </div>
               </div>
 
@@ -293,7 +240,6 @@ export const AppShell: React.FC = () => {
                     setSearchQuery(e.target.value);
                     if (!e.target.value.trim()) {
                       setPageResults(null);
-                      setChatResults(null);
                     }
                   }}
                   onKeyDown={(e) => {
@@ -371,34 +317,6 @@ export const AppShell: React.FC = () => {
                       </div>
                     )}
 
-                    {chatResults && chatResults.length > 0 && (
-                      <div className="animate-stagger">
-                        <div className="px-3 py-1 bg-muted/20 border-b border-border/50">
-                          <span className="text-[10px] uppercase tracking-wide text-muted-foreground font-medium">
-                            Conversas ({chatResults.length})
-                          </span>
-                        </div>
-                        {chatResults.map((r, i) => (
-                          <button
-                            key={`c${i}`}
-                            onClick={() => void handleOpenChatResult(r.sessionId)}
-                            className="w-full text-left px-3 py-2 hover:bg-accent border-b border-border/50 transition-colors group"
-                          >
-                            <div className="flex items-start gap-2">
-                              <ChatIcon className="w-3.5 h-3.5 text-primary shrink-0 mt-0.5" />
-                              <div className="min-w-0">
-                                <span className="text-xs font-medium text-foreground block truncate group-hover:text-primary transition-colors italic">
-                                  {r.sessionTitle ?? 'Sem título'}
-                                </span>
-                                <span className="text-[10px] text-muted-foreground block mt-0.5 line-clamp-2">
-                                  {r.snippet}
-                                </span>
-                              </div>
-                            </div>
-                          </button>
-                        ))}
-                      </div>
-                    )}
                   </>
                 )}
               </div>
@@ -434,14 +352,13 @@ export const AppShell: React.FC = () => {
                     setSearchQuery(e.target.value);
                     if (!e.target.value.trim()) {
                       setPageResults(null);
-                      setChatResults(null);
                     }
                   }}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') void handleSearch();
                     if (e.key === 'Escape') clearSearch();
                   }}
-                  placeholder="Pesquisar páginas e conversas…"
+                  placeholder="Pesquisar páginas…"
                   className="w-full text-xs pl-7 pr-2 py-1.5 border border-input bg-card text-foreground rounded focus:outline-none focus:border-primary transition-colors"
                 />
                 {searching && (
@@ -493,34 +410,6 @@ export const AppShell: React.FC = () => {
                               </span>
                               <span className="text-[10px] text-muted-foreground block mt-0.5 line-clamp-2">
                                 {r.reason}
-                              </span>
-                            </div>
-                          </div>
-                        </button>
-                      ))}
-                    </>
-                  )}
-                  {chatResults && chatResults.length > 0 && (
-                    <>
-                      <div className="px-3 py-1 bg-muted/20 border-b border-border/50">
-                        <span className="text-[10px] uppercase tracking-wide text-muted-foreground font-medium">
-                          Conversas ({chatResults.length})
-                        </span>
-                      </div>
-                      {chatResults.map((r, i) => (
-                        <button
-                          key={`c${i}`}
-                          onClick={() => void handleOpenChatResult(r.sessionId)}
-                          className="w-full text-left px-3 py-2 hover:bg-accent border-b border-border/50 transition-colors group"
-                        >
-                          <div className="flex items-start gap-2">
-                            <ChatIcon className="w-3.5 h-3.5 text-primary shrink-0 mt-0.5" />
-                            <div className="min-w-0">
-                              <span className="text-xs font-medium text-foreground block truncate group-hover:text-primary transition-colors italic">
-                                {r.sessionTitle ?? 'Sem título'}
-                              </span>
-                              <span className="text-[10px] text-muted-foreground block mt-0.5 line-clamp-2">
-                                {r.snippet}
                               </span>
                             </div>
                           </div>
@@ -589,6 +478,7 @@ export const AppShell: React.FC = () => {
           onCommentSelect={handleCommentSelect}
           deleteCommentRef={deleteCommentRef}
           updateCommentRef={updateCommentRef}
+          scrollToCommentRef={scrollToCommentRef}
           chatTab={chatTab}
           onSetTab={setChatTab}
           commentCount={comments.length}

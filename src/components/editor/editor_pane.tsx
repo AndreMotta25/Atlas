@@ -36,11 +36,16 @@ import { markdownFoldService } from './markdown_fold';
 import { stickyHeaderPlugin } from './sticky_header';
 import { ContextMenu, type MenuEntry } from './context_menu';
 import { CommentPopup } from './comment_popup';
-import type { CommentEntry } from '../app_shell';
+import {
+  findComments,
+  serializeAnnotation,
+  genCommentId,
+  type CommentEntry,
+} from './comment_parser';
 import {
   ChatIcon, FormatIcon, EyeIcon, PencilIcon, TrashIcon, SendIcon,
 } from '../icons';
-import { HIGHLIGHT_COLORS, parseCommentAnnotation, DEFAULT_HIGHLIGHT_COLOR, type HighlightColor } from '../../types';
+import { HIGHLIGHT_COLORS, DEFAULT_HIGHLIGHT_COLOR, type HighlightColor } from '../../types';
 import { api } from '../../lib/api';
 import {
   changeIndent,
@@ -68,12 +73,13 @@ interface EditorPaneProps {
   onCommentSelect: (index: number) => void;
   deleteCommentRef: React.MutableRefObject<((index: number) => void) | null>;
   updateCommentRef: React.MutableRefObject<((index: number, newComment: string) => void) | null>;
+  scrollToCommentRef: React.MutableRefObject<((index: number) => void) | null>;
   chatTab: 'chat' | 'comments';
   onSetTab: (tab: 'chat' | 'comments') => void;
   commentCount: number;
 }
 
-export const EditorPane: React.FC<EditorPaneProps> = ({ onCommentsChange, onCommentSelect, deleteCommentRef, updateCommentRef, chatTab, onSetTab, commentCount }) => {
+export const EditorPane: React.FC<EditorPaneProps> = ({ onCommentsChange, onCommentSelect, deleteCommentRef, updateCommentRef, scrollToCommentRef, chatTab, onSetTab, commentCount }) => {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const viewRef = useRef<EditorView | null>(null);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -117,6 +123,7 @@ export const EditorPane: React.FC<EditorPaneProps> = ({ onCommentsChange, onComm
   // Popup state — editing an existing highlight
   const [commentEdit, setCommentEdit] = useState<{
     index: number;
+    id: string;
     text: string;
     comment: string;
     color: HighlightColor;
@@ -127,85 +134,54 @@ export const EditorPane: React.FC<EditorPaneProps> = ({ onCommentsChange, onComm
   // Extract all comments from the document — recomputed on every doc edit via
   // `liveDoc`, so the sidebar list stays in sync immediately after
   // create/edit/delete actions (before the debounced save updates currentContent).
-  const comments = useMemo<CommentEntry[]>(() => {
-    const doc = liveDoc;
-    const results: CommentEntry[] = [];
-    const HIGHLIGHT_GLOBAL = /==([^=]+)==/g;
-    let hm: RegExpExecArray | null;
-    while ((hm = HIGHLIGHT_GLOBAL.exec(doc))) {
-      const after = doc.slice(hm.index + hm[0].length, hm.index + hm[0].length + 50);
-      const cm = /<!--c:(.+?)-->/.exec(after);
-      if (cm) {
-        const parsed = parseCommentAnnotation(cm[1]);
-        results.push({ pos: hm.index, text: hm[1], comment: parsed.comment.trim(), color: parsed.color });
-      }
-    }
-    return results;
-  }, [liveDoc]);
+  const comments = useMemo<CommentEntry[]>(() => findComments(liveDoc), [liveDoc]);
 
   // Report comments upstream
   useEffect(() => {
     onCommentsChange(comments);
   }, [comments, onCommentsChange]);
 
-  // Delete the comment at the given index (called from ChatPanel via AppShell)
+  // Delete the comment at the given index (called from ChatPanel via AppShell).
+  // Uses the parsed fullFrom/fullTo range — never a text-based regex — so
+  // duplicate highlights cannot be confused with each other.
   deleteCommentRef.current = (index: number) => {
     const view = viewRef.current;
     if (!view) return;
-    // Re-read comments from current document
     const doc = view.state.doc.toString();
-    const currentComments: CommentEntry[] = [];
-    const re = /==([^=]+)==/g;
-    let hm: RegExpExecArray | null;
-    while ((hm = re.exec(doc))) {
-      const after = doc.slice(hm.index + hm[0].length, hm.index + hm[0].length + 50);
-      const cm = /<!--c:(.+?)-->/.exec(after);
-      if (cm) {
-        const parsed = parseCommentAnnotation(cm[1]);
-        currentComments.push({ pos: hm.index, text: hm[1], comment: parsed.comment.trim(), color: parsed.color });
-      }
-    }
-    const c = currentComments[index];
+    const list = findComments(doc);
+    const c = list[index];
     if (!c) return;
-
-    const escText = c.text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const regex = new RegExp(`==${escText}==(<!--c:.*?-->)?`, 'g');
-    const match = regex.exec(doc);
-    if (!match) return;
-
     view.dispatch({
-      changes: { from: match.index, to: match.index + match[0].length, insert: c.text },
+      changes: { from: c.fullFrom, to: c.fullTo, insert: c.text },
     });
   };
 
-  // Update the comment text at the given index (called from ChatPanel via AppShell)
+  // Update the comment text at the given index (called from ChatPanel via AppShell).
   updateCommentRef.current = (index: number, newComment: string) => {
     const view = viewRef.current;
     if (!view) return;
     const doc = view.state.doc.toString();
-    const currentComments: CommentEntry[] = [];
-    const re = /==([^=]+)==/g;
-    let hm: RegExpExecArray | null;
-    while ((hm = re.exec(doc))) {
-      const after = doc.slice(hm.index + hm[0].length, hm.index + hm[0].length + 50);
-      const cm = /<!--c:(.+?)-->/.exec(after);
-      if (cm) {
-        const parsed = parseCommentAnnotation(cm[1]);
-        currentComments.push({ pos: hm.index, text: hm[1], comment: parsed.comment.trim(), color: parsed.color });
-      }
-    }
-    const c = currentComments[index];
+    const list = findComments(doc);
+    const c = list[index];
     if (!c) return;
-
-    const escText = c.text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const regex = new RegExp(`==${escText}==(<!--c:.*?-->)?`, 'g');
-    const match = regex.exec(doc);
-    if (!match) return;
-
-    const colorSuffix = c.color !== 'yellow' ? `|${c.color}` : '';
-    const annotation = newComment.trim() ? `<!--c:${newComment}${colorSuffix}-->` : `<!--c:|${c.color}-->`;
+    const annotation = serializeAnnotation(newComment.trim(), c.color, c.id);
     view.dispatch({
-      changes: { from: match.index, to: match.index + match[0].length, insert: `==${c.text}==${annotation}` },
+      changes: { from: c.fullFrom, to: c.fullTo, insert: `==${c.text}==${annotation}` },
+    });
+  };
+
+  // Scroll the editor viewport so the highlight of the comment at `index`
+  // is in view and selected. Called when the user clicks a sidebar card.
+  scrollToCommentRef.current = (index: number) => {
+    const view = viewRef.current;
+    if (!view) return;
+    const doc = view.state.doc.toString();
+    const list = findComments(doc);
+    const c = list[index];
+    if (!c) return;
+    view.dispatch({
+      selection: { anchor: c.pos, head: c.pos + c.text.length },
+      effects: EditorView.scrollIntoView(c.pos, { y: 'center' }),
     });
   };
 
@@ -222,13 +198,16 @@ export const EditorPane: React.FC<EditorPaneProps> = ({ onCommentsChange, onComm
         const v = viewRef.current;
         if (!v) return;
         const pos = v.posAtDOM(highlight);
-        const idx = comments.findIndex((c) => c.pos === pos || (c.pos <= pos && c.pos + c.text.length >= pos));
+        const idx = comments.findIndex(
+          (c) => pos >= c.fullFrom && pos <= c.fullTo,
+        );
         if (idx === -1) return;
         const c = comments[idx];
         const coords = v.coordsAtPos(c.pos);
         onCommentSelect(idx);
         setCommentEdit({
           index: idx,
+          id: c.id,
           text: c.text,
           comment: c.comment,
           color: c.color as HighlightColor,
@@ -405,8 +384,7 @@ export const EditorPane: React.FC<EditorPaneProps> = ({ onCommentsChange, onComm
   const commitCreate = (comment: string, color: HighlightColor) => {
     const view = viewRef.current;
     if (!view || !commentDraft) return;
-    const colorSuffix = color !== 'yellow' ? `|${color}` : '';
-    const annotation = comment ? `<!--c:${comment}${colorSuffix}-->` : `<!--c:|${color}-->`;
+    const annotation = serializeAnnotation(comment.trim(), color, genCommentId());
     view.dispatch({
       changes: {
         from: commentDraft.docFrom,
@@ -420,43 +398,42 @@ export const EditorPane: React.FC<EditorPaneProps> = ({ onCommentsChange, onComm
   const commitEdit = (comment: string, color: HighlightColor) => {
     const view = viewRef.current;
     if (!view || !commentEdit) return;
-    const c = commentEdit;
+    // Re-parse the doc so we get the up-to-date range for this comment's id.
+    // Falls back to the captured index if the id is no longer present
+    // (e.g. the user just edited the markup manually).
     const doc = view.state.doc.toString();
-    const escText = c.text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    // Match the highlight optionally followed by its current comment annotation
-    const regex = new RegExp(`==${escText}==(<!--c:.*?-->)?`);
-    const match = regex.exec(doc);
-    if (match) {
-      const colorSuffix = color !== 'yellow' ? `|${color}` : '';
-      const annotation = comment ? `<!--c:${comment}${colorSuffix}-->` : `<!--c:|${color}-->`;
-      view.dispatch({
-        changes: {
-          from: match.index,
-          to: match.index + match[0].length,
-          insert: `==${c.text}==${annotation}`,
-        },
-      });
+    const list = findComments(doc);
+    const c =
+      list.find((entry) => entry.id === commentEdit.id) ?? list[commentEdit.index];
+    if (!c) {
+      setCommentEdit(null);
+      return;
     }
+    const annotation = serializeAnnotation(comment.trim(), color, c.id);
+    view.dispatch({
+      changes: {
+        from: c.fullFrom,
+        to: c.fullTo,
+        insert: `==${c.text}==${annotation}`,
+      },
+    });
     setCommentEdit(null);
   };
 
   const deleteFromEdit = () => {
     const view = viewRef.current;
     if (!view || !commentEdit) return;
-    const c = commentEdit;
     const doc = view.state.doc.toString();
-    const escText = c.text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const regex = new RegExp(`==${escText}==(<!--c:.*?-->)?`);
-    const match = regex.exec(doc);
-    if (match) {
-      view.dispatch({
-        changes: {
-          from: match.index,
-          to: match.index + match[0].length,
-          insert: c.text,
-        },
-      });
+    const list = findComments(doc);
+    const c =
+      list.find((entry) => entry.id === commentEdit.id) ?? list[commentEdit.index];
+    if (!c) {
+      setCommentEdit(null);
+      return;
     }
+    view.dispatch({
+      changes: { from: c.fullFrom, to: c.fullTo, insert: c.text },
+    });
     setCommentEdit(null);
   };
 
@@ -553,11 +530,12 @@ export const EditorPane: React.FC<EditorPaneProps> = ({ onCommentsChange, onComm
     if (!view) return;
     const sel = view.state.selection.main;
     const text = view.state.sliceDoc(sel.from, sel.to) || 'texto';
+    const annotation = serializeAnnotation('', color, genCommentId());
     view.dispatch({
       changes: {
         from: sel.from,
         to: sel.to,
-        insert: `==${text}==<!--c:|${color}-->`,
+        insert: `==${text}==${annotation}`,
       },
     });
   };
