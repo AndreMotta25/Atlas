@@ -29,6 +29,10 @@ export const registerVaultHandlers = (): void => {
     return VaultManager.readTree();
   });
 
+  ipcMain.handle(createChannel('vault', 'exists'), async (_e, relPath: string) => {
+    return VaultManager.exists(relPath);
+  });
+
   ipcMain.handle(createChannel('vault', 'read-page'), async (_e, relPath: string) => {
     return VaultManager.readPage(relPath) as Promise<PageContent>;
   });

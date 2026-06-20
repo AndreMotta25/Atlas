@@ -177,13 +177,9 @@ export const AppShell: React.FC = () => {
     let n = 1;
     let rel = base;
     for (;;) {
-      try {
-        await api.vault.readPage(rel);
-        n += 1;
-        rel = `${base}-${n}`;
-      } catch {
-        break;
-      }
+      if (!(await api.vault.exists(rel))) break;
+      n += 1;
+      rel = `${base}-${n}`;
     }
     await api.vault.createFolder(rel);
     await loadTree();

@@ -84,6 +84,16 @@ class VaultManagerClass {
     return abs;
   }
 
+  async exists(relPath: string): Promise<boolean> {
+    const abs = this.resolve(relPath);
+    try {
+      await fsp.stat(abs);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   async readPage(relPath: string): Promise<{ path: string; content: string; mtime: number }> {
     const abs = this.resolve(relPath);
     const stat = await fsp.stat(abs);

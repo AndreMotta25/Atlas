@@ -64,6 +64,8 @@ const electronAPI = {
     getStatus: (): Promise<VaultStatus> => ipcRenderer.invoke(createChannel('vault', 'get-status')),
     select: (): Promise<VaultStatus> => ipcRenderer.invoke(createChannel('vault', 'select')),
     readTree: (): Promise<VaultTree | null> => ipcRenderer.invoke(createChannel('vault', 'read-tree')),
+    exists: (relPath: string): Promise<boolean> =>
+      ipcRenderer.invoke(createChannel('vault', 'exists'), relPath),
     readPage: (relPath: string): Promise<PageContent> =>
       ipcRenderer.invoke(createChannel('vault', 'read-page'), relPath),
     writePage: (relPath: string, content: string): Promise<{ success: boolean }> =>
