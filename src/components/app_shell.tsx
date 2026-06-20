@@ -58,6 +58,10 @@ export const AppShell: React.FC = () => {
   type ChatMode = 'panel' | 'bubble' | 'overlay';
   const [chatMode, setChatMode] = useState<ChatMode>('panel');
 
+  // Overlay drag position (offset from top-left of the viewport).
+  const [overlayPos, setOverlayPos] = useState<{ x: number; y: number } | null>(null);
+  const dragRef = useRef<{ startX: number; startY: number; origX: number; origY: number } | null>(null);
+
   // Close the overlay with Esc.
   useEffect(() => {
     if (chatMode !== 'overlay') return;
@@ -67,6 +71,31 @@ export const AppShell: React.FC = () => {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [chatMode]);
+
+  // Drag handlers for the floating overlay.
+  const onDragStart = (e: React.MouseEvent) => {
+    // Only start drag from left mouse button.
+    if (e.button !== 0) return;
+    const start = overlayPos ?? { x: 0, y: 0 };
+    dragRef.current = { startX: e.clientX, startY: e.clientY, origX: start.x, origY: start.y };
+  };
+
+  useEffect(() => {
+    const onMove = (e: MouseEvent) => {
+      const d = dragRef.current;
+      if (!d) return;
+      const dx = e.clientX - d.startX;
+      const dy = e.clientY - d.startY;
+      setOverlayPos({ x: d.origX + dx, y: d.origY + dy });
+    };
+    const onUp = () => { dragRef.current = null; };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+    return () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+  }, []);
 
   // Search state
   const [searchQuery, setSearchQuery] = useState('');
@@ -538,20 +567,31 @@ export const AppShell: React.FC = () => {
           onClick={() => setChatMode('panel')}
         >
           <div
-            className="relative w-full max-w-3xl h-[85vh] bg-card border border-border rounded-2xl shadow-2xl overflow-hidden"
+            className="relative w-full max-w-3xl h-[85vh] bg-card border border-border rounded-2xl shadow-2xl overflow-hidden flex flex-col"
+            style={overlayPos ? { transform: `translate(${overlayPos.x}px, ${overlayPos.y}px)` } : undefined}
             onClick={(e) => e.stopPropagation()}
           >
-            <ChatPanel
-              chatTab={chatTab}
-              onSetTab={setChatTab}
-              comments={comments}
-              commentIndex={commentIndex}
-              onCommentIndexChange={setCommentIndex}
-              onDeleteComment={handleDeleteComment}
-              onUpdateComment={handleUpdateComment}
-              onToggleChat={() => setChatMode('panel')}
-              showInput
-            />
+            {/* Drag handle */}
+            <div
+              onMouseDown={onDragStart}
+              className="shrink-0 h-7 flex items-center justify-center cursor-grab active:cursor-grabbing border-b border-border bg-muted/30 hover:bg-muted/50 transition-colors"
+              title="Arraste para mover"
+            >
+              <div className="w-10 h-1 rounded-full bg-muted-foreground/40" />
+            </div>
+            <div className="flex-1 overflow-hidden">
+              <ChatPanel
+                chatTab={chatTab}
+                onSetTab={setChatTab}
+                comments={comments}
+                commentIndex={commentIndex}
+                onCommentIndexChange={setCommentIndex}
+                onDeleteComment={handleDeleteComment}
+                onUpdateComment={handleUpdateComment}
+                onToggleChat={() => setChatMode('panel')}
+                showInput
+              />
+            </div>
           </div>
         </div>
       )}

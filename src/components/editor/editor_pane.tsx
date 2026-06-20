@@ -99,6 +99,31 @@ export const EditorPane: React.FC<EditorPaneProps> = ({ onCommentsChange, onComm
 
   const [chatInput, setChatInput] = useState('');
 
+  // Floating chat input drag — null = default centered-bottom position.
+  const [chatInputPos, setChatInputPos] = useState<{ x: number; y: number } | null>(null);
+  const chatInputDragRef = useRef<{ startX: number; startY: number; origX: number; origY: number } | null>(null);
+
+  const onChatInputDragStart = (e: React.MouseEvent) => {
+    if (e.button !== 0) return;
+    const start = chatInputPos ?? { x: 0, y: 0 };
+    chatInputDragRef.current = { startX: e.clientX, startY: e.clientY, origX: start.x, origY: start.y };
+  };
+
+  useEffect(() => {
+    const onMove = (e: MouseEvent) => {
+      const d = chatInputDragRef.current;
+      if (!d) return;
+      setChatInputPos({ x: d.origX + (e.clientX - d.startX), y: d.origY + (e.clientY - d.startY) });
+    };
+    const onUp = () => { chatInputDragRef.current = null; };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+    return () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+  }, []);
+
   const [menuPos, setMenuPos] = useState<{ x: number; y: number } | null>(null);
   const [renaming, setRenaming] = useState(false);
   const [renameDraft, setRenameDraft] = useState('');
@@ -763,8 +788,29 @@ export const EditorPane: React.FC<EditorPaneProps> = ({ onCommentsChange, onComm
         {chatTab === 'chat' && (
           <form
             onSubmit={handleChatSubmit}
-            className="absolute bottom-3 left-1/2 -translate-x-1/2 z-20 w-[min(560px,92%)] flex gap-2 p-2.5 bg-card/95 backdrop-blur-sm border border-border rounded-2xl shadow-2xl"
+            className="absolute bottom-3 left-1/2 z-20 w-[min(560px,92%)] flex gap-2 p-2.5 bg-card/95 backdrop-blur-sm border border-border rounded-2xl shadow-2xl"
+            style={chatInputPos
+              ? { left: `calc(50% + ${chatInputPos.x}px)`, bottom: `calc(0.75rem - ${chatInputPos.y}px)`, transform: 'translateX(-50%)' }
+              : { transform: 'translateX(-50%)' }}
           >
+            {/* Drag grip — sits just above the input */}
+            <button
+              type="button"
+              onMouseDown={onChatInputDragStart}
+              onDoubleClick={() => setChatInputPos(null)}
+              className="absolute -top-3 left-1/2 -translate-x-1/2 flex items-center justify-center w-7 h-5 cursor-grab active:cursor-grabbing rounded-md bg-card border border-border shadow-md text-muted-foreground/60 hover:text-muted-foreground hover:bg-accent transition-colors"
+              title="Arraste para mover · duplo-clique para redefinir"
+              aria-label="Mover input"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-3 h-3">
+                <circle cx="9" cy="6" r="1.4" />
+                <circle cx="15" cy="6" r="1.4" />
+                <circle cx="9" cy="12" r="1.4" />
+                <circle cx="15" cy="12" r="1.4" />
+                <circle cx="9" cy="18" r="1.4" />
+                <circle cx="15" cy="18" r="1.4" />
+              </svg>
+            </button>
             <textarea
               value={chatInput}
               onChange={(e) => setChatInput(e.target.value)}
