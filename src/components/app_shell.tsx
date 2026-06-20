@@ -5,6 +5,7 @@ import type { ActivityId } from './sidebar/activity_bar';
 import { EditorPane } from './editor/editor_pane';
 import { ChatPanel } from './chat/chat_panel';
 import { SettingsModal } from './settings/settings_modal';
+import { HomeView } from './home/home_view';
 import { useVaultStore } from '../stores/vault_store';
 import { useChatStore } from '../stores/chat_store';
 import { useTheme } from '../hooks/use_theme';
@@ -57,6 +58,15 @@ export const AppShell: React.FC = () => {
   // 'overlay' = detached full-screen modal floating over the editor.
   type ChatMode = 'panel' | 'bubble' | 'overlay';
   const [chatMode, setChatMode] = useState<ChatMode>('panel');
+
+  // Whether the Home view is shown instead of the editor.
+  const currentPath = useVaultStore((s) => s.currentPath);
+  const [viewingHome, setViewingHome] = useState(true);
+
+  // Opening any page leaves the Home view.
+  useEffect(() => {
+    if (currentPath !== null) setViewingHome(false);
+  }, [currentPath]);
 
   // Overlay drag position (offset from top-left of the viewport).
   const [overlayPos, setOverlayPos] = useState<{ x: number; y: number } | null>(null);
@@ -505,7 +515,12 @@ export const AppShell: React.FC = () => {
   return (
     <div className="flex h-screen bg-background text-foreground overflow-hidden">
       {/* Activity bar — always visible (VS Code style) */}
-      <ActivityBar active={activeActivity} onChange={handleActivityChange} />
+      <ActivityBar
+        active={activeActivity}
+        onChange={handleActivityChange}
+        homeActive={viewingHome}
+        onHome={() => setViewingHome(true)}
+      />
 
       {sidebarVisible ? (
         <aside className="border-r border-border flex flex-col overflow-hidden" style={{ width: sidebarWidth, minWidth: MIN_SIDEBAR }}>
@@ -516,21 +531,25 @@ export const AppShell: React.FC = () => {
       {sidebarVisible && <ResizeHandle onStart={() => { resizeRef.current = 'sidebar'; }} />}
 
       <main className="overflow-hidden flex flex-col flex-1">
-        <EditorPane
-          onCommentsChange={setComments}
-          onCommentSelect={handleCommentSelect}
-          deleteCommentRef={deleteCommentRef}
-          updateCommentRef={updateCommentRef}
-          scrollToCommentRef={scrollToCommentRef}
-          chatTab={chatTab}
-          onSetTab={setChatTab}
-          commentCount={comments.length}
-        />
+        {viewingHome ? (
+          <HomeView />
+        ) : (
+          <EditorPane
+            onCommentsChange={setComments}
+            onCommentSelect={handleCommentSelect}
+            deleteCommentRef={deleteCommentRef}
+            updateCommentRef={updateCommentRef}
+            scrollToCommentRef={scrollToCommentRef}
+            chatTab={chatTab}
+            onSetTab={setChatTab}
+            commentCount={comments.length}
+          />
+        )}
       </main>
 
-      {chatMode === 'panel' && <ResizeHandle onStart={() => { resizeRef.current = 'chat'; }} />}
+      {chatMode === 'panel' && !viewingHome && <ResizeHandle onStart={() => { resizeRef.current = 'chat'; }} />}
 
-      {chatMode === 'panel' ? (
+      {chatMode === 'panel' && !viewingHome ? (
         <aside className="border-l border-border overflow-hidden" style={{ width: chatWidth, minWidth: MIN_CHAT }}>
           <ChatPanel
             chatTab={chatTab}
