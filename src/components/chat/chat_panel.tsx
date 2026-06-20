@@ -164,8 +164,6 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   const messages = useChatStore((s) => s.messages);
   const streaming = useChatStore((s) => s.streaming);
   const error = useChatStore((s) => s.error);
-  const send = useChatStore((s) => s.send);
-  const cancel = useChatStore((s) => s.cancel);
   const activeRequestId = useChatStore((s) => s.activeRequestId);
   const compactConversation = useChatStore((s) => s.compactConversation);
   const contextPages = useChatStore((s) => s.contextPages);
@@ -178,7 +176,6 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   const loadConversation = useChatStore((s) => s.loadConversation);
   const deleteConversation = useChatStore((s) => s.deleteConversation);
 
-  const [input, setInput] = useState('');
   const [sessionMenuOpen, setSessionMenuOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const sessionMenuRef = useRef<HTMLDivElement | null>(null);
@@ -198,21 +195,6 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
   }, [messages]);
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    const text = input.trim();
-    if (!text || streaming) return;
-    setInput('');
-    void send(text);
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleSubmit(e as unknown as React.FormEvent);
-    }
-  };
 
   return (
     <div className="flex flex-col h-full bg-background">
@@ -423,33 +405,6 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="border-t border-border p-2 flex gap-2">
-            <textarea
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder="Escreva uma mensagem…"
-              rows={2}
-              className="flex-1 resize-none text-sm px-2 py-1 border border-input bg-card text-foreground rounded focus:outline-none focus:border-primary"
-            />
-            {streaming ? (
-              <button
-                type="button"
-                onClick={() => void cancel()}
-                className="px-3 py-1 bg-destructive/20 text-destructive rounded text-sm hover:bg-destructive/30"
-              >
-                Parar
-              </button>
-            ) : (
-              <button
-                type="submit"
-                disabled={!input.trim()}
-                className="px-3 py-1 bg-primary text-primary-foreground rounded text-sm hover:brightness-90 disabled:opacity-40 disabled:cursor-not-allowed transition-opacity"
-              >
-                Enviar
-              </button>
-            )}
-          </form>
         </>
       )}
 

@@ -235,7 +235,7 @@ input {
 .cm-editor .cm-selectionBackground,
 .cm-editor.cm-focused .cm-selectionBackground,
 .cm-editor .cm-selectionLayer {
-  background: color-mix(in srgb, var(--color-primary) 22%, transparent) !important;
+  background: color-mix(in srgb, var(--color-primary) 55%, transparent) !important;
 }
 
 .cm-editor .cm-cursor,

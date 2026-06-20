@@ -87,6 +87,12 @@ export const EditorPane: React.FC<EditorPaneProps> = ({ onCommentsChange, onComm
   const fontFamily = useSettingsStore((s) => s.settings.fontFamily);
   const updateSettings = useSettingsStore((s) => s.update);
 
+  const streaming = useChatStore((s) => s.streaming);
+  const sendChat = useChatStore((s) => s.send);
+  const cancelChat = useChatStore((s) => s.cancel);
+
+  const [chatInput, setChatInput] = useState('');
+
   const [menuPos, setMenuPos] = useState<{ x: number; y: number } | null>(null);
   const [renaming, setRenaming] = useState(false);
   const [renameDraft, setRenameDraft] = useState('');
@@ -336,7 +342,7 @@ export const EditorPane: React.FC<EditorPaneProps> = ({ onCommentsChange, onComm
         }
         const coords = v.coordsAtPos(sel.to);
         if (coords) {
-          setMenuPos({ x: coords.left, y: coords.bottom + 6 });
+          setMenuPos({ x: coords.left + 20, y: coords.bottom + 6 });
         }
       }, 80);
     };
@@ -525,6 +531,21 @@ export const EditorPane: React.FC<EditorPaneProps> = ({ onCommentsChange, onComm
       chatStore.loadPageContext(currentPath);
     }
     setMenuPos(null);
+  };
+
+  const handleChatSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const text = chatInput.trim();
+    if (!text || streaming) return;
+    setChatInput('');
+    void sendChat(text);
+  };
+
+  const handleChatKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleChatSubmit(e as unknown as React.FormEvent);
+    }
   };
 
   const addHighlightWithColor = (color: HighlightColor) => {
@@ -759,6 +780,39 @@ export const EditorPane: React.FC<EditorPaneProps> = ({ onCommentsChange, onComm
               Selecione ou crie um arquivo para começar a editar
             </p>
           </div>
+        )}
+        {/* Floating chat input */}
+        {chatTab === 'chat' && (
+          <form
+            onSubmit={handleChatSubmit}
+            className="absolute bottom-3 left-1/2 -translate-x-1/2 z-20 w-[min(560px,92%)] flex gap-2 p-2.5 bg-card/95 backdrop-blur-sm border border-border rounded-2xl shadow-2xl"
+          >
+            <textarea
+              value={chatInput}
+              onChange={(e) => setChatInput(e.target.value)}
+              onKeyDown={handleChatKeyDown}
+              placeholder="Escreva uma mensagem…"
+              rows={2}
+              className="flex-1 resize-none text-sm px-3 py-2 border border-input bg-background text-foreground rounded-xl focus:outline-none focus:border-primary placeholder:text-muted-foreground/60"
+            />
+            {streaming ? (
+              <button
+                type="button"
+                onClick={() => void cancelChat()}
+                className="px-4 py-2 bg-destructive/10 text-destructive rounded-xl text-sm font-medium hover:bg-destructive/20 transition-colors shrink-0"
+              >
+                Parar
+              </button>
+            ) : (
+              <button
+                type="submit"
+                disabled={!chatInput.trim()}
+                className="px-4 py-2 bg-primary text-primary-foreground rounded-xl text-sm font-medium hover:brightness-90 disabled:opacity-40 disabled:cursor-not-allowed transition-all shrink-0"
+              >
+                Enviar
+              </button>
+            )}
+          </form>
         )}
       </div>
 
