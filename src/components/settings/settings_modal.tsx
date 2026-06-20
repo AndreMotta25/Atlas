@@ -217,7 +217,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
             <div className="flex items-center gap-2">
               <button
                 onClick={handleChangeVault}
-                className={`px-3 py-1 rounded text-sm ${
+                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
                   confirmVault
                     ? 'bg-destructive text-primary-foreground hover:brightness-90'
                     : 'bg-muted hover:bg-accent text-foreground'
@@ -228,7 +228,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
               {confirmVault && (
                 <button
                   onClick={() => setConfirmVault(false)}
-                  className="px-3 py-1 bg-muted hover:bg-accent rounded text-sm text-foreground"
+                  className="px-3 py-1.5 bg-muted hover:bg-accent rounded-lg text-sm font-medium transition-colors text-foreground"
                 >
                   Cancelar
                 </button>
@@ -244,7 +244,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                 <button
                   key={opt.id}
                   onClick={() => void setTheme(opt.id)}
-                  className={`px-3 py-2 rounded text-sm border ${
+                  className={`px-3 py-2 rounded-lg text-sm font-medium border transition-colors ${
                     settings.themeMode === opt.id
                       ? 'border-primary bg-accent text-accent-foreground'
                       : 'border-border hover:bg-accent text-foreground'
@@ -264,7 +264,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                 <button
                   key={p.id}
                   onClick={() => void handleProviderChange(p.id)}
-                  className={`px-3 py-2 rounded text-sm border ${
+                  className={`px-3 py-2 rounded-lg text-sm font-medium border transition-colors ${
                     settings.activeProvider === p.id
                       ? 'border-primary bg-accent text-accent-foreground'
                       : 'border-border hover:bg-accent text-foreground'
@@ -335,7 +335,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                 )}
                 <button
                   onClick={handleResetPrompt}
-                  className="text-xs text-muted-foreground hover:text-foreground underline"
+                  className="text-xs text-muted-foreground hover:text-foreground underline transition-colors"
                 >
                   Restaurar padrão
                 </button>
@@ -384,14 +384,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
               />
               <button
                 onClick={handleSaveKey}
-                className="px-3 py-1 bg-primary text-primary-foreground rounded text-sm hover:brightness-90"
+                className="px-3 py-1.5 bg-primary text-primary-foreground rounded-lg text-sm font-medium transition-colors hover:brightness-90"
               >
                 Salvar
               </button>
               {hasKey && (
                 <button
                   onClick={handleDeleteKey}
-                  className="px-3 py-1 bg-destructive/20 text-destructive rounded text-sm hover:bg-destructive/30"
+                  className="px-3 py-1.5 bg-destructive/20 text-destructive rounded-lg text-sm font-medium transition-colors hover:bg-destructive/30"
                 >
                   Remover
                 </button>
@@ -427,14 +427,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
               />
               <button
                 onClick={handleSaveTavilyKey}
-                className="px-3 py-1 bg-primary text-primary-foreground rounded text-sm hover:brightness-90"
+                className="px-3 py-1.5 bg-primary text-primary-foreground rounded-lg text-sm font-medium transition-colors hover:brightness-90"
               >
                 Salvar
               </button>
               {hasTavilyKey && (
                 <button
                   onClick={handleDeleteTavilyKey}
-                  className="px-3 py-1 bg-destructive/20 text-destructive rounded text-sm hover:bg-destructive/30"
+                  className="px-3 py-1.5 bg-destructive/20 text-destructive rounded-lg text-sm font-medium transition-colors hover:bg-destructive/30"
                 >
                   Remover
                 </button>
@@ -448,7 +448,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
         <footer className="px-5 py-3 border-t border-border flex justify-end">
           <button
             onClick={onClose}
-            className="px-4 py-1 bg-muted text-foreground rounded text-sm hover:bg-accent"
+            className="px-3 py-1.5 bg-muted text-foreground rounded-lg text-sm font-medium transition-colors hover:bg-accent"
           >
             Fechar
           </button>
