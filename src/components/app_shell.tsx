@@ -519,7 +519,18 @@ export const AppShell: React.FC = () => {
         active={activeActivity}
         onChange={handleActivityChange}
         homeActive={viewingHome}
-        onHome={() => setViewingHome(true)}
+        onHome={() => {
+          setViewingHome(true);
+          // Clear conversation view without tearing down IPC listeners
+          // (reset() would unsubscribe ai:token and break the next stream).
+          useChatStore.setState({
+            messages: [],
+            streaming: false,
+            activeSession: null,
+            activeRequestId: null,
+            error: null,
+          });
+        }}
       />
 
       {sidebarVisible ? (
