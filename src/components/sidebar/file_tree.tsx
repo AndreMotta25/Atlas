@@ -5,6 +5,7 @@ import { useChatStore } from '../../stores/chat_store';
 import { ContextMenu } from '../editor/context_menu';
 import type { MenuEntry } from '../editor/context_menu';
 import type { VaultTree } from '../../types';
+import { createNewPage, createNewFolder } from '../../lib/vault_utils';
 import { FileIcon, FolderIcon, FolderOpen, FolderPlus, SendIcon } from '../icons';
 
 interface TreeNodeProps {
@@ -263,36 +264,9 @@ export const FileTree: React.FC = () => {
     setRenamingPath(null);
   };
 
-  const handleNewPage = async () => {
-    const base = 'sem-titulo';
-    let n = 1;
-    let rel = `${base}.md`;
-    for (;;) {
-      try {
-        await api.vault.readPage(rel);
-        n += 1;
-        rel = `${base}-${n}.md`;
-      } catch {
-        break;
-      }
-    }
-    await api.vault.writePage(rel, `# ${base}${n > 1 ? ' ' + n : ''}\n\n`);
-    await loadTree();
-    await openPage(rel);
-  };
+  const handleNewPage: () => void = () => void createNewPage();
 
-  const handleNewFolder = async () => {
-    const base = 'nova-pasta';
-    let n = 1;
-    let rel = base;
-    for (;;) {
-      if (!(await api.vault.exists(rel))) break;
-      n += 1;
-      rel = `${base}-${n}`;
-    }
-    await api.vault.createFolder(rel);
-    await loadTree();
-  };
+  const handleNewFolder: () => void = () => void createNewFolder();
 
   const handleMove = async (srcPath: string, destPath: string) => {
     await api.vault.movePage(srcPath, destPath);
