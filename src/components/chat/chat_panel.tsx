@@ -6,6 +6,7 @@ import {
   PencilIcon, TrashIcon, QuoteIcon, PlusIcon, ChevronDown,
   CompressIcon, Minus, ChatIcon, ChevronLeft, ChevronRight, CommentEmptyIcon, CloseIcon, FileIcon, HighlighterIcon,
 } from '../icons';
+import { ThinkingIndicator } from '../thinking_indicator';
 import { HIGHLIGHT_COLORS } from '../../types';
 
 /** Format a timestamp as a relative time string (pt-BR). */
@@ -299,27 +300,15 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                 )}
               </div>
 
-              {/* Thinking / Writing indicator — animated dots */}
+              {/* Thinking / Writing indicator */}
               {streaming && (
-                <div className="flex items-center gap-1 ml-1">
-                  <span
-                    className="w-1.5 h-1.5 rounded-full bg-primary"
-                    style={{ animation: 'dot-bounce 1.4s ease-in-out infinite', animationDelay: '0s' }}
-                  />
-                  <span
-                    className="w-1.5 h-1.5 rounded-full bg-primary"
-                    style={{ animation: 'dot-bounce 1.4s ease-in-out infinite', animationDelay: '0.2s' }}
-                  />
-                  <span
-                    className="w-1.5 h-1.5 rounded-full bg-primary"
-                    style={{ animation: 'dot-bounce 1.4s ease-in-out infinite', animationDelay: '0.4s' }}
-                  />
-                  <span className="text-[11px] text-muted-foreground ml-0.5">
-                    {messages.length > 0 && messages[messages.length - 1].role === 'assistant' && messages[messages.length - 1].content
-                      ? 'Gerando resposta...'
-                      : 'Pensando...'}
-                  </span>
-                </div>
+                <ThinkingIndicator
+                  hasContent={
+                    messages.length > 0 &&
+                    messages[messages.length - 1].role === 'assistant' &&
+                    !!messages[messages.length - 1].content
+                  }
+                />
               )}
             </div>
             <div className="flex items-center gap-0.5">

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useChatStore } from '../../stores/chat_store';
 import { useVaultStore } from '../../stores/vault_store';
 import { Message } from '../chat/message';
+import { ThinkingIndicator } from '../thinking_indicator';
 import type { ChatSession, VaultTree } from '../../types';
 
 const SUGGESTIONS = [
@@ -74,8 +75,11 @@ export const HomeView: React.FC = () => {
   const sendChat = useChatStore((s) => s.send);
   const cancelChat = useChatStore((s) => s.cancel);
   const sessions = useChatStore((s) => s.sessions);
+  const activeSession = useChatStore((s) => s.activeSession);
   const loadConversation = useChatStore((s) => s.loadConversation);
   const newConversation = useChatStore((s) => s.newConversation);
+  const deleteConversation = useChatStore((s) => s.deleteConversation);
+  const compactConversation = useChatStore((s) => s.compactConversation);
 
   const openPage = useVaultStore((s) => s.openPage);
   const tree = useVaultStore((s) => s.tree);
@@ -249,6 +253,75 @@ export const HomeView: React.FC = () => {
   // ─── Active conversation state ───────────────────────────────────
   return (
     <div className="flex flex-col h-full bg-background overflow-hidden">
+      {/* Header bar */}
+      <div className="shrink-0 flex items-center justify-between px-4 py-1.5 border-b border-border bg-muted/30">
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground truncate max-w-[200px]">
+            {activeSession?.title ?? 'Atlas'}
+          </span>
+
+          {/* Thinking / Writing indicator */}
+          {streaming && (
+            <ThinkingIndicator
+              hasContent={
+                messages.length > 0 &&
+                messages[messages.length - 1].role === 'assistant' &&
+                !!messages[messages.length - 1].content
+              }
+            />
+          )}
+        </div>
+
+        <div className="flex items-center gap-0.5">
+          <button
+            onClick={() => void newConversation()}
+            className="p-1 hover:bg-accent rounded text-muted-foreground hover:text-foreground transition-colors"
+            title="Nova conversa"
+            aria-label="Nova conversa"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5">
+              <path d="M12 20h9" />
+              <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
+            </svg>
+          </button>
+          {activeSession && !streaming && (
+            <button
+              onClick={() => {
+                if (window.confirm('Tem certeza que deseja apagar esta conversa?')) {
+                  void deleteConversation(activeSession.id);
+                }
+              }}
+              className="p-1 hover:bg-accent rounded text-muted-foreground hover:text-destructive transition-colors"
+              title="Apagar conversa"
+              aria-label="Apagar conversa"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5">
+                <polyline points="3 6 5 6 21 6" />
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                <line x1="10" y1="11" x2="10" y2="17" />
+                <line x1="14" y1="11" x2="14" y2="17" />
+              </svg>
+            </button>
+          )}
+          {messages.length > 2 && !streaming && (
+            <button
+              onClick={() => void compactConversation()}
+              className="p-1 hover:bg-accent rounded text-muted-foreground hover:text-foreground transition-colors"
+              title="Compactar conversa"
+              aria-label="Compactar conversa"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5">
+                <polyline points="18 6 22 10 18 14" />
+                <line x1="22" y1="10" x2="14" y2="10" />
+                <polyline points="6 18 2 14 6 10" />
+                <line x1="2" y1="14" x2="10" y2="14" />
+                <line x1="12" y1="8" x2="12" y2="16" />
+              </svg>
+            </button>
+          )}
+        </div>
+      </div>
+
       <div ref={scrollRef} className="flex-1 overflow-auto">
         <div className="max-w-3xl mx-auto px-6 pt-6 pb-4 space-y-3">
           {messages.map((m, idx) => (

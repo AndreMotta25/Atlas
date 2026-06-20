@@ -13,10 +13,11 @@ import { useFont } from '../hooks/use_font';
 import { api } from '../lib/api';
 import {
   SearchIcon, SpinnerIcon, CloseIcon, FileIcon, FolderPlus, PlusIcon,
-  GearIcon, SearchEmptyIcon, ClockIcon, SuccessIcon,
+  GearIcon, SearchEmptyIcon, ClockIcon, SuccessIcon, AtlasActivityIcon, ChatIcon,
   ChevronLeft, ChevronRight,
 } from './icons';
 
+import type { ChatSession } from '../types';
 import type { CommentEntry } from './editor/comment_parser';
 export type { CommentEntry };
 
@@ -38,6 +39,11 @@ export const AppShell: React.FC = () => {
   const openPage = useVaultStore((s) => s.openPage);
   const subscribeWatch = useVaultStore((s) => s.subscribeWatch);
   const initChat = useChatStore((s) => s.init);
+  const sessions = useChatStore((s) => s.sessions);
+  const activeSession = useChatStore((s) => s.activeSession);
+  const newConversation = useChatStore((s) => s.newConversation);
+  const loadConversation = useChatStore((s) => s.loadConversation);
+  const deleteConversation = useChatStore((s) => s.deleteConversation);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [sidebarWidth, setSidebarWidth] = useState(260);
   const [chatWidth, setChatWidth] = useState(380);
@@ -503,6 +509,109 @@ export const AppShell: React.FC = () => {
               >
                 Abrir configurações
               </button>
+            </div>
+          </div>
+        );
+
+      case 'atlas':
+        return (
+          <div className="flex flex-col flex-1 overflow-hidden">
+            <div className="px-2 py-1.5 border-b border-border flex items-center justify-between">
+              <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Atlas
+              </span>
+              <button
+                onClick={() => setSidebarVisible(false)}
+                className="p-1 hover:bg-accent rounded text-muted-foreground hover:text-foreground transition-colors"
+                title="Fechar painel"
+                aria-label="Fechar painel"
+              >
+                <ChevronLeft className="w-3.5 h-3.5" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-auto">
+              {/* New conversation button */}
+              <div className="p-2">
+                <button
+                  onClick={async () => {
+                    await newConversation();
+                    setViewingHome(true);
+                  }}
+                  className="w-full flex items-center gap-2 px-3 py-2 text-xs bg-primary text-primary-foreground hover:brightness-90 rounded-lg font-medium transition-all"
+                >
+                  <PlusIcon className="w-3.5 h-3.5" />
+                  Nova conversa
+                </button>
+              </div>
+
+              {/* Active conversation indicator */}
+              {activeSession && (
+                <div className="px-3 py-1.5 border-y border-border bg-muted/20">
+                  <p className="text-[10px] uppercase tracking-wide text-muted-foreground font-medium mb-1">
+                    Conversa ativa
+                  </p>
+                  <button
+                    onClick={() => setViewingHome(true)}
+                    className="w-full text-left text-xs px-2 py-1.5 rounded hover:bg-accent text-foreground transition-colors truncate flex items-center gap-2"
+                    title={activeSession.title ?? 'Sem título'}
+                  >
+                    <ChatIcon className="w-3.5 h-3.5 text-primary shrink-0" />
+                    <span className="truncate">{activeSession.title ?? 'Sem título'}</span>
+                  </button>
+                </div>
+              )}
+
+              {/* Recent conversations */}
+              <div className="px-3 py-2">
+                <p className="text-[10px] uppercase tracking-wide text-muted-foreground font-medium mb-1.5">
+                  Conversas recentes
+                </p>
+                {sessions.length === 0 ? (
+                  <p className="text-[11px] text-muted-foreground/60 italic">
+                    Nenhuma conversa ainda.
+                  </p>
+                ) : (
+                  <div className="space-y-0.5">
+                    {sessions.map((s: ChatSession) => (
+                      <div
+                        key={s.id}
+                        className="group flex items-center gap-2"
+                      >
+                        <button
+                          onClick={async () => {
+                            await loadConversation(s.id);
+                            setViewingHome(true);
+                          }}
+                          className="flex-1 flex items-center gap-2 text-left text-xs px-2 py-1.5 rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-colors min-w-0"
+                          title={s.title ?? 'Sem título'}
+                        >
+                          <ChatIcon className="w-3 h-3 shrink-0" />
+                          <span className="truncate">{s.title ?? 'Sem título'}</span>
+                        </button>
+                        <button
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            await deleteConversation(s.id);
+                          }}
+                          className="shrink-0 p-1 rounded text-muted-foreground/40 hover:text-destructive opacity-0 group-hover:opacity-100 transition-all"
+                          title="Excluir conversa"
+                          aria-label="Excluir conversa"
+                        >
+                          <CloseIcon className="w-3 h-3" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Footer hint */}
+            <div className="shrink-0 px-3 py-2 border-t border-border">
+              <p className="text-[10px] text-muted-foreground/60 text-center">
+                Pressione Enter para enviar, Shift+Enter para nova linha
+              </p>
             </div>
           </div>
         );
