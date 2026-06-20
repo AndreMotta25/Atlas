@@ -1,5 +1,5 @@
 ---
-name: react-solid-typescript
+name: electron-react-solid-typescript
 description: >
   Use esta skill ao criar ou refatorar componentes React com TypeScript neste projeto. Documenta
   como aplicar os cinco princípios SOLID no contexto de componentes funcionais React: SRP (separar
