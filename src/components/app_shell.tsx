@@ -1,5 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { FileTree } from './sidebar/file_tree';
+import { ActivityBar } from './sidebar/activity_bar';
+import type { ActivityId } from './sidebar/activity_bar';
 import { EditorPane } from './editor/editor_pane';
 import { ChatPanel } from './chat/chat_panel';
 import { SettingsModal } from './settings/settings_modal';
@@ -11,7 +13,7 @@ import { api } from '../lib/api';
 import type { ChatSearchResult } from '../types';
 import {
   MenuHamburger, SearchIcon, SpinnerIcon, CloseIcon, FileIcon, FolderPlus,
-  GearIcon, ChevronDown, ChatIcon, SearchEmptyIcon, ClockIcon, SuccessIcon,
+  GearIcon, ChatIcon, SearchEmptyIcon, ClockIcon, SuccessIcon,
   ChevronLeft, ChevronRight,
 } from './icons';
 
@@ -46,7 +48,8 @@ export const AppShell: React.FC = () => {
   const [sidebarWidth, setSidebarWidth] = useState(260);
   const [chatWidth, setChatWidth] = useState(380);
   const [chatVisible, setChatVisible] = useState(true);
-  const [vaultVisible, setVaultVisible] = useState(true);
+  const [sidebarVisible, setSidebarVisible] = useState(true);
+  const [activeActivity, setActiveActivity] = useState<ActivityId>('projects');
 
   const resizeRef = useRef<'sidebar' | 'chat' | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
@@ -195,6 +198,20 @@ export const AppShell: React.FC = () => {
     await useChatStore.getState().loadConversation(sessionId);
   };
 
+  const handleActivityChange = (id: ActivityId) => {
+    if (id === activeActivity) {
+      // Toggle sidebar off when clicking the active icon (VS Code behavior)
+      setSidebarVisible((v) => !v);
+    } else {
+      setActiveActivity(id);
+      setSidebarVisible(true);
+      // Focus search input when switching to search activity
+      if (id === 'search') {
+        setTimeout(() => searchInputRef.current?.focus(), 0);
+      }
+    }
+  };
+
   const clearSearch = () => {
     setSearchQuery('');
     setPageResults(null);
@@ -206,128 +223,257 @@ export const AppShell: React.FC = () => {
     (chatResults !== null && chatResults.length > 0);
   const showingResults = pageResults !== null || chatResults !== null;
 
-  return (
-    <div className="flex h-screen bg-background text-foreground overflow-hidden">
-      {vaultVisible ? (
-        <aside className="border-r border-border flex flex-col overflow-hidden" style={{ width: sidebarWidth, minWidth: MIN_SIDEBAR }}>
-          {/* Sidebar header with search */}
-          <div className="px-2 py-1.5 border-b border-border space-y-1">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-1">
-                <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  Vault
-                </span>
-                <button
-                  onClick={() => setVaultVisible(false)}
-                  className="p-1 hover:bg-accent rounded text-muted-foreground hover:text-foreground transition-colors"
-                  title="Fechar vault"
-                  aria-label="Fechar vault"
-                >
-                  <ChevronLeft className="w-3.5 h-3.5" />
-                </button>
+  const renderActivityView = () => {
+    switch (activeActivity) {
+      case 'projects':
+        return (
+          <>
+            {/* Sidebar header */}
+            <div className="px-2 py-1.5 border-b border-border space-y-1">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1">
+                  <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    Projetos
+                  </span>
+                  <button
+                    onClick={() => setSidebarVisible(false)}
+                    className="p-1 hover:bg-accent rounded text-muted-foreground hover:text-foreground transition-colors"
+                    title="Fechar painel"
+                    aria-label="Fechar painel"
+                  >
+                    <ChevronLeft className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+                <div ref={menuRef} className="relative">
+                  <button
+                    onClick={() => setMenuOpen((o) => !o)}
+                    className="p-1 hover:bg-accent rounded text-muted-foreground hover:text-foreground transition-colors"
+                    title="Menu"
+                    aria-label="Menu"
+                  >
+                    <MenuHamburger />
+                  </button>
+                  {menuOpen && (
+                    <div className="absolute right-0 top-full mt-1 z-50 min-w-[180px] bg-card border border-border rounded-lg shadow-lg py-1 text-sm animate-scale-in">
+                      <button
+                        onClick={handleNewPage}
+                        className="w-full text-left px-3 py-1.5 hover:bg-accent flex items-center gap-2.5"
+                      >
+                        <FileIcon className="w-4 h-4 text-muted-foreground shrink-0" />
+                        Nova página
+                      </button>
+                      <button
+                        onClick={handleNewFolder}
+                        className="w-full text-left px-3 py-1.5 hover:bg-accent flex items-center gap-2.5"
+                      >
+                        <FolderPlus className="w-4 h-4 text-muted-foreground shrink-0" />
+                        Nova pasta
+                      </button>
+                      <div className="h-px bg-border my-1" />
+                      <button
+                        onClick={() => { setMenuOpen(false); setSettingsOpen(true); }}
+                        className="w-full text-left px-3 py-1.5 hover:bg-accent flex items-center gap-2.5"
+                      >
+                        <GearIcon className="w-4 h-4 text-muted-foreground shrink-0" />
+                        Configurações
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
-              <div ref={menuRef} className="relative">
-                <button
-                  onClick={() => setMenuOpen((o) => !o)}
-                  className="p-1 hover:bg-accent rounded text-muted-foreground hover:text-foreground transition-colors"
-                  title="Menu"
-                  aria-label="Menu"
-                >
-                  <MenuHamburger />
-                </button>
-                {menuOpen && (
-                  <div className="absolute right-0 top-full mt-1 z-50 min-w-[180px] bg-card border border-border rounded-lg shadow-lg py-1 text-sm animate-scale-in">
-                    <button
-                      onClick={handleNewPage}
-                      className="w-full text-left px-3 py-1.5 hover:bg-accent flex items-center gap-2.5"
-                    >
-                      <FileIcon className="w-4 h-4 text-muted-foreground shrink-0" />
-                      Nova página
-                    </button>
-                    <button
-                      onClick={handleNewFolder}
-                      className="w-full text-left px-3 py-1.5 hover:bg-accent flex items-center gap-2.5"
-                    >
-                      <FolderPlus className="w-4 h-4 text-muted-foreground shrink-0" />
-                      Nova pasta
-                    </button>
-                    <div className="h-px bg-border my-1" />
-                    <button
-                      onClick={() => { setMenuOpen(false); setSettingsOpen(true); }}
-                      className="w-full text-left px-3 py-1.5 hover:bg-accent flex items-center gap-2.5"
-                    >
-                      <GearIcon className="w-4 h-4 text-muted-foreground shrink-0" />
-                      Configurações
-                    </button>
-                  </div>
+
+              {/* Search bar */}
+              <div className="relative">
+                <SearchIcon className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
+                <input
+                  ref={searchInputRef}
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => {
+                    setSearchQuery(e.target.value);
+                    if (!e.target.value.trim()) {
+                      setPageResults(null);
+                      setChatResults(null);
+                    }
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') void handleSearch();
+                    if (e.key === 'Escape') clearSearch();
+                  }}
+                  onFocus={() => {
+                    if (searchQuery.trim() && !hasResults) void handleSearch();
+                  }}
+                  placeholder="Pesquisar no vault…"
+                  className="w-full text-xs pl-7 pr-2 py-1.5 border border-input bg-card text-foreground rounded focus:outline-none focus:border-primary transition-colors"
+                />
+                {searching && (
+                  <SpinnerIcon className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+                )}
+                {searchQuery && !searching && (
+                  <button
+                    onClick={clearSearch}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    <CloseIcon className="w-3 h-3" />
+                  </button>
                 )}
               </div>
             </div>
 
-            {/* Search bar */}
-            <div className="relative">
-              <SearchIcon className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
-              <input
-                ref={searchInputRef}
-                type="text"
-                value={searchQuery}
-                onChange={(e) => {
-                  setSearchQuery(e.target.value);
-                  if (!e.target.value.trim()) {
-                    setPageResults(null);
-                    setChatResults(null);
-                  }
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') void handleSearch();
-                  if (e.key === 'Escape') clearSearch();
-                }}
-                onFocus={() => {
-                  // Re-run search if results are empty and query exists
-                  if (searchQuery.trim() && !hasResults) void handleSearch();
-                }}
-                placeholder="Pesquisar no vault…"
-                className="w-full text-xs pl-7 pr-2 py-1.5 border border-input bg-card text-foreground rounded focus:outline-none focus:border-primary transition-colors"
-              />
-              {searching && (
-                <SpinnerIcon className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
-              )}
-              {searchQuery && !searching && (
-                <button
-                  onClick={clearSearch}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  <CloseIcon className="w-3 h-3" />
-                </button>
-              )}
-            </div>
-          </div>
+            {/* Search results or file tree */}
+            {showingResults ? (
+              <div className="flex-1 overflow-auto">
+                {!hasResults ? (
+                  <div className="px-3 py-6 text-center">
+                    <SearchEmptyIcon className="w-8 h-8 mx-auto text-muted-foreground/40 mb-2" />
+                    <p className="text-xs text-muted-foreground">Nenhum resultado encontrado.</p>
+                  </div>
+                ) : (
+                  <>
+                    <div className="px-3 py-1.5 border-b border-border bg-muted/30 flex items-center justify-between">
+                      <span className="text-[10px] uppercase tracking-wide text-muted-foreground font-medium">
+                        Resultados
+                      </span>
+                      <button
+                        onClick={clearSearch}
+                        className="text-[10px] text-muted-foreground hover:text-foreground transition-colors"
+                      >
+                        Voltar
+                      </button>
+                    </div>
 
-          {/* Search results or file tree */}
-          {showingResults ? (
+                    {pageResults && pageResults.length > 0 && (
+                      <div className="animate-stagger">
+                        <div className="px-3 py-1 bg-muted/20 border-b border-border/50">
+                          <span className="text-[10px] uppercase tracking-wide text-muted-foreground font-medium">
+                            Páginas ({pageResults.length})
+                          </span>
+                        </div>
+                        {pageResults.map((r, i) => (
+                          <button
+                            key={`p${i}`}
+                            onClick={() => void handleOpenSearchResult(r.path)}
+                            className="w-full text-left px-3 py-2 hover:bg-accent border-b border-border/50 transition-colors group"
+                          >
+                            <div className="flex items-start gap-2">
+                              <FileIcon className="w-3.5 h-3.5 text-primary shrink-0 mt-0.5" />
+                              <div className="min-w-0">
+                                <span className="text-xs font-medium text-foreground block truncate group-hover:text-primary transition-colors">
+                                  {r.path}
+                                </span>
+                                <span className="text-[10px] text-muted-foreground block mt-0.5 line-clamp-2">
+                                  {r.reason}
+                                </span>
+                              </div>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+
+                    {chatResults && chatResults.length > 0 && (
+                      <div className="animate-stagger">
+                        <div className="px-3 py-1 bg-muted/20 border-b border-border/50">
+                          <span className="text-[10px] uppercase tracking-wide text-muted-foreground font-medium">
+                            Conversas ({chatResults.length})
+                          </span>
+                        </div>
+                        {chatResults.map((r, i) => (
+                          <button
+                            key={`c${i}`}
+                            onClick={() => void handleOpenChatResult(r.sessionId)}
+                            className="w-full text-left px-3 py-2 hover:bg-accent border-b border-border/50 transition-colors group"
+                          >
+                            <div className="flex items-start gap-2">
+                              <ChatIcon className="w-3.5 h-3.5 text-primary shrink-0 mt-0.5" />
+                              <div className="min-w-0">
+                                <span className="text-xs font-medium text-foreground block truncate group-hover:text-primary transition-colors italic">
+                                  {r.sessionTitle ?? 'Sem título'}
+                                </span>
+                                <span className="text-[10px] text-muted-foreground block mt-0.5 line-clamp-2">
+                                  {r.snippet}
+                                </span>
+                              </div>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            ) : (
+              <FileTree />
+            )}
+          </>
+        );
+
+      case 'search':
+        return (
+          <div className="flex flex-col flex-1 overflow-hidden">
+            <div className="px-2 py-1.5 border-b border-border flex items-center justify-between">
+              <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Pesquisar
+              </span>
+              <button
+                onClick={() => setSidebarVisible(false)}
+                className="p-1 hover:bg-accent rounded text-muted-foreground hover:text-foreground transition-colors"
+                title="Fechar painel"
+                aria-label="Fechar painel"
+              >
+                <ChevronLeft className="w-3.5 h-3.5" />
+              </button>
+            </div>
+            <div className="p-2 space-y-2">
+              <div className="relative">
+                <SearchIcon className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => {
+                    setSearchQuery(e.target.value);
+                    if (!e.target.value.trim()) {
+                      setPageResults(null);
+                      setChatResults(null);
+                    }
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') void handleSearch();
+                    if (e.key === 'Escape') clearSearch();
+                  }}
+                  placeholder="Pesquisar páginas e conversas…"
+                  className="w-full text-xs pl-7 pr-2 py-1.5 border border-input bg-card text-foreground rounded focus:outline-none focus:border-primary transition-colors"
+                />
+                {searching && (
+                  <SpinnerIcon className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+                )}
+                {searchQuery && !searching && (
+                  <button
+                    onClick={clearSearch}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    <CloseIcon className="w-3 h-3" />
+                  </button>
+                )}
+              </div>
+            </div>
             <div className="flex-1 overflow-auto">
-              {!hasResults ? (
+              {!hasResults && !searchQuery && (
+                <div className="px-3 py-6 text-center">
+                  <SearchEmptyIcon className="w-8 h-8 mx-auto text-muted-foreground/40 mb-2" />
+                  <p className="text-xs text-muted-foreground">Digite para pesquisar no vault.</p>
+                </div>
+              )}
+              {!hasResults && searchQuery && (
                 <div className="px-3 py-6 text-center">
                   <SearchEmptyIcon className="w-8 h-8 mx-auto text-muted-foreground/40 mb-2" />
                   <p className="text-xs text-muted-foreground">Nenhum resultado encontrado.</p>
                 </div>
-              ) : (
-                <>
-                  <div className="px-3 py-1.5 border-b border-border bg-muted/30 flex items-center justify-between">
-                    <span className="text-[10px] uppercase tracking-wide text-muted-foreground font-medium">
-                      Resultados
-                    </span>
-                    <button
-                      onClick={clearSearch}
-                      className="text-[10px] text-muted-foreground hover:text-foreground transition-colors"
-                    >
-                      Voltar
-                    </button>
-                  </div>
-
-                  {/* Pages section */}
+              )}
+              {hasResults && (
+                <div className="animate-stagger">
                   {pageResults && pageResults.length > 0 && (
-                    <div className="animate-stagger">
+                    <>
                       <div className="px-3 py-1 bg-muted/20 border-b border-border/50">
                         <span className="text-[10px] uppercase tracking-wide text-muted-foreground font-medium">
                           Páginas ({pageResults.length})
@@ -352,12 +498,10 @@ export const AppShell: React.FC = () => {
                           </div>
                         </button>
                       ))}
-                    </div>
+                    </>
                   )}
-
-                  {/* Chat messages section */}
                   {chatResults && chatResults.length > 0 && (
-                    <div className="animate-stagger">
+                    <>
                       <div className="px-3 py-1 bg-muted/20 border-b border-border/50">
                         <span className="text-[10px] uppercase tracking-wide text-muted-foreground font-medium">
                           Conversas ({chatResults.length})
@@ -382,27 +526,62 @@ export const AppShell: React.FC = () => {
                           </div>
                         </button>
                       ))}
-                    </div>
+                    </>
                   )}
-                </>
+                </div>
               )}
             </div>
-          ) : (
-            <FileTree />
-          )}
-        </aside>
-      ) : (
-        <button
-          onClick={() => setVaultVisible(true)}
-          className="border-r border-border flex items-center justify-center w-7 hover:bg-accent text-muted-foreground hover:text-foreground transition-colors shrink-0 cursor-pointer"
-          title="Abrir vault"
-          aria-label="Abrir vault"
-        >
-          <ChevronRight className="w-3.5 h-3.5" />
-        </button>
-      )}
+          </div>
+        );
 
-      {vaultVisible && <ResizeHandle onStart={() => { resizeRef.current = 'sidebar'; }} />}
+      case 'settings':
+        return (
+          <div className="flex flex-col flex-1 overflow-hidden">
+            <div className="px-2 py-1.5 border-b border-border flex items-center justify-between">
+              <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Configurações
+              </span>
+              <button
+                onClick={() => setSidebarVisible(false)}
+                className="p-1 hover:bg-accent rounded text-muted-foreground hover:text-foreground transition-colors"
+                title="Fechar painel"
+                aria-label="Fechar painel"
+              >
+                <ChevronLeft className="w-3.5 h-3.5" />
+              </button>
+            </div>
+            <div className="flex-1 flex flex-col items-center justify-center p-4 gap-3">
+              <GearIcon className="w-8 h-8 text-muted-foreground/40" />
+              <p className="text-xs text-muted-foreground text-center">
+                Preferências do editor, tema e provedor de IA.
+              </p>
+              <button
+                onClick={() => setSettingsOpen(true)}
+                className="px-4 py-1.5 text-xs bg-primary text-primary-foreground hover:brightness-90 rounded-lg font-medium transition-all"
+              >
+                Abrir configurações
+              </button>
+            </div>
+          </div>
+        );
+
+      default:
+        return null;
+    }
+  };
+
+  return (
+    <div className="flex h-screen bg-background text-foreground overflow-hidden">
+      {/* Activity bar — always visible (VS Code style) */}
+      <ActivityBar active={activeActivity} onChange={handleActivityChange} />
+
+      {sidebarVisible ? (
+        <aside className="border-r border-border flex flex-col overflow-hidden" style={{ width: sidebarWidth, minWidth: MIN_SIDEBAR }}>
+          {renderActivityView()}
+        </aside>
+      ) : null}
+
+      {sidebarVisible && <ResizeHandle onStart={() => { resizeRef.current = 'sidebar'; }} />}
 
       <main className="overflow-hidden flex flex-col flex-1">
         <EditorPane
