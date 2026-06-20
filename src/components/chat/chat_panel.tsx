@@ -447,7 +447,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                 onKeyDown={handleChatKeyDown}
                 placeholder="Escreva uma mensagem…"
                 rows={2}
-                className="flex-1 resize-none text-sm px-3 py-2 border border-input bg-card text-foreground rounded-xl focus:outline-none focus:border-primary placeholder:text-muted-foreground/60"
+                className="flex-1 resize-none text-sm px-3 py-2 border border-input bg-background text-foreground rounded-xl focus:outline-none focus:border-primary placeholder:text-muted-foreground/60"
               />
               {streaming ? (
                 <button

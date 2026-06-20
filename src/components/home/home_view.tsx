@@ -118,20 +118,8 @@ export const HomeView: React.FC = () => {
   const composer = (
     <form
       onSubmit={handleSubmit}
-      className="w-full max-w-2xl flex items-end gap-2 p-2 bg-card border border-border rounded-2xl shadow-lg focus-within:border-primary/50 transition-colors"
+      className="w-full max-w-2xl flex items-center gap-2 p-2 bg-card border border-border rounded-2xl shadow-lg focus-within:border-primary/50 transition-colors"
     >
-      <button
-        type="button"
-        onClick={() => void newConversation()}
-        title="Nova conversa"
-        aria-label="Nova conversa"
-        className="shrink-0 p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
-      >
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
-          <line x1="12" y1="5" x2="12" y2="19" />
-          <line x1="5" y1="12" x2="19" y2="12" />
-        </svg>
-      </button>
       <textarea
         ref={inputRef}
         value={input}
@@ -139,7 +127,7 @@ export const HomeView: React.FC = () => {
         onKeyDown={handleKeyDown}
         placeholder="Pergunte qualquer coisa ao Atlas…"
         rows={1}
-        className="flex-1 resize-none text-sm bg-transparent text-foreground placeholder:text-muted-foreground/60 focus:outline-none max-h-40"
+        className="flex-1 resize-none text-sm px-3 py-2 border border-input bg-background text-foreground rounded-xl focus:outline-none focus:border-primary placeholder:text-muted-foreground/60 max-h-40"
       />
       {streaming ? (
         <button

@@ -801,7 +801,7 @@ export const EditorPane: React.FC<EditorPaneProps> = ({ onCommentsChange, onComm
           <form
             ref={chatInputRef}
             onSubmit={handleChatSubmit}
-            className="fixed z-50 w-[min(560px,92%)] flex gap-2 p-2.5 bg-card/95 backdrop-blur-sm border border-border rounded-2xl shadow-2xl"
+            className="fixed z-50 w-[min(560px,92%)] flex items-center gap-2 p-2 bg-card border border-border rounded-2xl shadow-lg focus-within:border-primary/50 transition-colors"
             style={chatInputPos
               ? { left: chatInputPos.left, top: chatInputPos.top }
               : { left: '50%', bottom: '0.75rem', transform: 'translateX(-50%)' }}
