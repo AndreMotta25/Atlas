@@ -45,6 +45,7 @@ import {
 import {
   ChatIcon, FormatIcon, EyeIcon, PencilIcon, TrashIcon, SendIcon,
 } from '../icons';
+import { SendButton } from '../send_button';
 import { HIGHLIGHT_COLORS, DEFAULT_HIGHLIGHT_COLOR, type HighlightColor } from '../../types';
 import { api } from '../../lib/api';
 import {
@@ -841,13 +842,7 @@ export const EditorPane: React.FC<EditorPaneProps> = ({ onCommentsChange, onComm
                 Parar
               </button>
             ) : (
-              <button
-                type="submit"
-                disabled={!chatInput.trim()}
-                className="px-4 py-2 bg-primary text-primary-foreground rounded-xl text-sm font-medium hover:brightness-90 disabled:opacity-40 disabled:cursor-not-allowed transition-all shrink-0"
-              >
-                Enviar
-              </button>
+              <SendButton disabled={!chatInput.trim()} loading={streaming} />
             )}
           </form>
         )}
