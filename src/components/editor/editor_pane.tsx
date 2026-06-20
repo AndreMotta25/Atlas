@@ -100,20 +100,32 @@ export const EditorPane: React.FC<EditorPaneProps> = ({ onCommentsChange, onComm
   const [chatInput, setChatInput] = useState('');
 
   // Floating chat input drag — null = default centered-bottom position.
-  const [chatInputPos, setChatInputPos] = useState<{ x: number; y: number } | null>(null);
-  const chatInputDragRef = useRef<{ startX: number; startY: number; origX: number; origY: number } | null>(null);
+  const [chatInputPos, setChatInputPos] = useState<{ left: number; top: number } | null>(null);
+  const chatInputDragRef = useRef<{ startX: number; startY: number; origLeft: number; origTop: number } | null>(null);
+  const chatInputRef = useRef<HTMLFormElement | null>(null);
 
   const onChatInputDragStart = (e: React.MouseEvent) => {
     if (e.button !== 0) return;
-    const start = chatInputPos ?? { x: 0, y: 0 };
-    chatInputDragRef.current = { startX: e.clientX, startY: e.clientY, origX: start.x, origY: start.y };
+    e.preventDefault();
+    const el = chatInputRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    chatInputDragRef.current = {
+      startX: e.clientX,
+      startY: e.clientY,
+      origLeft: rect.left,
+      origTop: rect.top,
+    };
   };
 
   useEffect(() => {
     const onMove = (e: MouseEvent) => {
       const d = chatInputDragRef.current;
       if (!d) return;
-      setChatInputPos({ x: d.origX + (e.clientX - d.startX), y: d.origY + (e.clientY - d.startY) });
+      setChatInputPos({
+        left: d.origLeft + (e.clientX - d.startX),
+        top: d.origTop + (e.clientY - d.startY),
+      });
     };
     const onUp = () => { chatInputDragRef.current = null; };
     window.addEventListener('mousemove', onMove);
@@ -787,11 +799,12 @@ export const EditorPane: React.FC<EditorPaneProps> = ({ onCommentsChange, onComm
         {/* Floating chat input */}
         {chatTab === 'chat' && (
           <form
+            ref={chatInputRef}
             onSubmit={handleChatSubmit}
-            className="absolute bottom-3 left-1/2 z-20 w-[min(560px,92%)] flex gap-2 p-2.5 bg-card/95 backdrop-blur-sm border border-border rounded-2xl shadow-2xl"
+            className="fixed z-50 w-[min(560px,92%)] flex gap-2 p-2.5 bg-card/95 backdrop-blur-sm border border-border rounded-2xl shadow-2xl"
             style={chatInputPos
-              ? { left: `calc(50% + ${chatInputPos.x}px)`, bottom: `calc(0.75rem - ${chatInputPos.y}px)`, transform: 'translateX(-50%)' }
-              : { transform: 'translateX(-50%)' }}
+              ? { left: chatInputPos.left, top: chatInputPos.top }
+              : { left: '50%', bottom: '0.75rem', transform: 'translateX(-50%)' }}
           >
             {/* Drag grip — sits just above the input */}
             <button
