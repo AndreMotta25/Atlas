@@ -73,14 +73,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
   sessions: [],
 
   init: () => {
-    // Load recent sessions + restore the most recent global one.
-    void get().refreshSessions().then(() => {
-      const { sessions, activeSession } = get();
-      if (activeSession) return;
-      const mostRecent = sessions[0];
-      if (!mostRecent) return;
-      void get().loadConversation(mostRecent.id);
-    });
+    // Load recent sessions only — do not auto-restore the last conversation,
+    // so the app starts on the clean Home view.
+    void get().refreshSessions();
 
     const offToken = api.ai.onToken((chunk: ChatStreamChunk) => {
       const state = get();
