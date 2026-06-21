@@ -1,7 +1,7 @@
 import { ipcMain } from 'electron';
 import { createChannel } from '../types';
 import { DatabaseService } from '../vault/db';
-import type { BacklinkResult, SearchResult } from '../types';
+import type { BacklinkResult, SearchResult, TagResult, TagPageResult } from '../types';
 
 export const registerSearchHandlers = (): void => {
   // Content search over the FTS5 index. Instant + free (no LLM call).
@@ -24,6 +24,31 @@ export const registerSearchHandlers = (): void => {
       if (typeof targetPath !== 'string') return [];
       try {
         return DatabaseService.getBacklinks(targetPath);
+      } catch {
+        return [];
+      }
+    },
+  );
+
+  // List all tags with page counts.
+  ipcMain.handle(
+    createChannel('vault', 'tags'),
+    async (): Promise<TagResult[]> => {
+      try {
+        return DatabaseService.listTags();
+      } catch {
+        return [];
+      }
+    },
+  );
+
+  // Pages that contain a given tag.
+  ipcMain.handle(
+    createChannel('vault', 'pages-by-tag'),
+    async (_e, tag: string): Promise<TagPageResult[]> => {
+      if (typeof tag !== 'string') return [];
+      try {
+        return DatabaseService.getPagesByTag(tag);
       } catch {
         return [];
       }

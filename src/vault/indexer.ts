@@ -15,7 +15,8 @@ import type { VaultTree } from '../types';
  */
 
 const WIKI_LINK_RE = /\[\[([^\]]+)\]\]/g;
-const TAG_RE = /(^|\s)#([\w][\w-]*)/g;
+// \p{L} = any Unicode letter, \p{N} = any Unicode digit — supports accents like ç, ã, é
+const TAG_RE = /(^|\s)#([\p{L}][\p{L}\p{N}_-]*)/gu;
 const H1_RE = /^\s*#\s+(.+?)\s*$/;
 const CODE_FENCE_RE = /^(\s*)(`{3,}|~{3,})/;
 
@@ -78,7 +79,7 @@ const parsePage = (content: string): ParsedPage => {
         links.push({ toPath: normalizeTarget(target), anchor: alias });
       }
 
-      const tagRe = new RegExp(TAG_RE.source, 'g');
+      const tagRe = new RegExp(TAG_RE.source, 'gu');
       while ((m = tagRe.exec(stripped)) !== null) {
         tags.add(m[2].toLowerCase());
       }

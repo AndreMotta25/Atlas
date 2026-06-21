@@ -141,22 +141,23 @@ class VaultManagerClass {
       awaitWriteFinish: { stabilityThreshold: 150, pollInterval: 50 },
     });
 
-    const emit = (type: VaultChangeEvent['type']) => (filePath: string) => {
+    const emit = (type: VaultChangeEvent['type']) => async (filePath: string) => {
       if (!this.root) return;
       const rel = path.relative(this.root, filePath).split(path.sep).join('/');
       if (!rel) return;
       const payload: VaultChangeEvent = { type, path: rel };
-      for (const win of BrowserWindow.getAllWindows()) {
-        win.webContents.send(createChannel('vault', 'changed'), payload);
-      }
-      // Keep the SQLite index in sync. Only `.md` files are tracked; directory
-      // events and non-markdown files are ignored by the indexer.
+      // Keep the SQLite index in sync BEFORE sending the event to the renderer,
+      // so that IPC handlers (e.g., tags, backlinks) reflect the latest state.
+      // Only `.md` files are tracked; directory events and non-markdown files are ignored by the indexer.
       if (rel.toLowerCase().endsWith('.md')) {
         if (type === 'unlink') {
           Indexer.removePage(rel);
         } else if (type === 'add' || type === 'change') {
-          void Indexer.indexPage(rel);
+          await Indexer.indexPage(rel);
         }
+      }
+      for (const win of BrowserWindow.getAllWindows()) {
+        win.webContents.send(createChannel('vault', 'changed'), payload);
       }
     };
 

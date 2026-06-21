@@ -2,7 +2,7 @@ import Database from 'better-sqlite3';
 import type { Database as DB } from 'better-sqlite3';
 import { app } from 'electron';
 import * as path from 'path';
-import type { BacklinkResult, ChatMessage, ChatSearchResult, ChatSession, SearchResult } from '../types';
+import type { BacklinkResult, ChatMessage, ChatSearchResult, ChatSession, SearchResult, TagResult, TagPageResult } from '../types';
 
 /**
  * SQLite layer for the Atlas vault index.
@@ -200,6 +200,33 @@ class DatabaseServiceClass {
       for (const t of tags) stmt.run(pageId, t);
     });
     tx();
+  }
+
+  // ── Tags ───────────────────────────────────────────────────────
+
+  /** List all distinct tags with their page count, ordered by count descending. */
+  listTags(): TagResult[] {
+    const db = this.requireOpen();
+    const rows = db.prepare(`
+      SELECT tag, COUNT(page_id) AS count
+      FROM tags
+      GROUP BY tag
+      ORDER BY count DESC, tag ASC
+    `).all() as Array<{ tag: string; count: number }>;
+    return rows;
+  }
+
+  /** Pages that contain a given tag. */
+  getPagesByTag(tag: string): TagPageResult[] {
+    const db = this.requireOpen();
+    const rows = db.prepare(`
+      SELECT p.path AS path, p.title AS title
+      FROM tags t
+      JOIN pages p ON p.id = t.page_id
+      WHERE t.tag = ?
+      ORDER BY p.path
+    `).all(tag.toLowerCase()) as Array<{ path: string; title: string | null }>;
+    return rows.map((r) => ({ path: r.path, title: r.title ?? r.path }));
   }
 
   // ── Queries ───────────────────────────────────────────────────

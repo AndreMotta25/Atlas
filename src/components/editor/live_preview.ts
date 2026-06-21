@@ -453,7 +453,7 @@ function isInsideCodeBlock(state: EditorState, pos: number): boolean {
 // ─── Wiki-links & @tags (regex pass) ────────────────────────────────
 
 const WIKI_LINK_RE = /\[\[([^\]\n]+)\]\]/g;
-const TAG_RE = /(^|[\s(])@([a-zA-Z][\w/-]*)/g;
+const TAG_RE = /(^|[\s(])@([\p{L}][\p{L}\p{N}/_-]*)/gu;
 
 function decorateWikiLinksAndTags(view: EditorView, decos: Range<Decoration>[]) {
   const state = view.state;

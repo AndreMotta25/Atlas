@@ -228,6 +228,17 @@ export interface BacklinkResult {
   anchor: string | null;
 }
 
+// ─── Tag Types ───────────────────────────────────────────────
+export interface TagResult {
+  tag: string;
+  count: number;
+}
+
+export interface TagPageResult {
+  path: string;
+  title: string;
+}
+
 // ─── Chat Session Types ────────────────────────────────────────
 export interface ChatSession {
   id: string;

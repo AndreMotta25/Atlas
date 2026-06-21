@@ -12,6 +12,8 @@ import type {
   PageContent,
   PendingToolCall,
   SearchResult,
+  TagResult,
+  TagPageResult,
   ToolConfirmRequest,
   ToolRejectRequest,
   ToolResultPayload,
@@ -88,6 +90,10 @@ const electronAPI = {
       ipcRenderer.invoke(createChannel('vault', 'search'), query, limit),
     backlinks: (targetPath: string): Promise<BacklinkResult[]> =>
       ipcRenderer.invoke(createChannel('vault', 'backlinks'), targetPath),
+    tags: (): Promise<TagResult[]> =>
+      ipcRenderer.invoke(createChannel('vault', 'tags')),
+    pagesByTag: (tag: string): Promise<TagPageResult[]> =>
+      ipcRenderer.invoke(createChannel('vault', 'pages-by-tag'), tag),
   },
 
   // ── Chat sessions (persistence) ──

@@ -27,7 +27,9 @@ export const useVaultStore = create<VaultState>((set, get) => ({
   },
 
   openPage: async (relPath) => {
+    console.log('[VaultStore] openPage called with:', relPath);
     const page: PageContent = await api.vault.readPage(relPath);
+    console.log('[VaultStore] openPage success, setting currentPath:', relPath);
     set({ currentPath: relPath, currentContent: page.content, dirty: false });
   },
 

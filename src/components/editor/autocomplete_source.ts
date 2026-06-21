@@ -58,7 +58,7 @@ function tagSource(ctx: CompletionContext): CompletionResult | null {
 
   // Collect tags from current document
   const docText = ctx.state.doc.toString();
-  const tagRE = /(?:^|[\s(])@([\w/-]+)/g;
+  const tagRE = /(?:^|[\s(])@([\p{L}\p{N}/_-]+)/gu;
   const seen = new Set<string>();
   let m: RegExpExecArray | null;
   while ((m = tagRE.exec(docText))) {
