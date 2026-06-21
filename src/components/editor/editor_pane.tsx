@@ -11,6 +11,7 @@ import {
 } from '@codemirror/view';
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands';
 import { markdown } from '@codemirror/lang-markdown';
+import { GFM } from '@lezer/markdown';
 import {
   syntaxHighlighting,
   defaultHighlightStyle,
@@ -28,7 +29,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useVaultStore } from '../../stores/vault_store';
 import { useChatStore } from '../../stores/chat_store';
 import { useSettingsStore } from '../../stores/settings_store';
-import { livePreview, livePreviewModeField, setLivePreviewMode, type LivePreviewMode } from './live_preview';
+import { livePreview, livePreviewModeField, setLivePreviewMode, tableWidgetField, tableViewportPlugin, type LivePreviewMode } from './live_preview';
 import { formatMarkdown } from './format_markdown';
 import { atlasCompletionSources } from './autocomplete_source';
 import { markdownLintSource } from './markdown_lint';
@@ -298,7 +299,7 @@ export const EditorPane: React.FC<EditorPaneProps> = ({ onCommentsChange, onComm
         EditorState.allowMultipleSelections.of(true),
 
         // ── Markdown language & folding ────────────────────
-        markdown(),
+        markdown({ extensions: [GFM] }),
         markdownFoldService,
         codeFolding(),
 
@@ -315,6 +316,8 @@ export const EditorPane: React.FC<EditorPaneProps> = ({ onCommentsChange, onComm
         // ── Live preview ───────────────────────────────────
         livePreviewModeField,
         livePreview,
+        tableWidgetField,
+        tableViewportPlugin,
 
         // ── Sticky headers ─────────────────────────────────
         stickyHeaderPlugin,

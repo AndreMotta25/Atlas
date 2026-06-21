@@ -230,7 +230,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
       {chatTab === 'chat' && (
         <>
           {/* Header with actions */}
-          <div className="flex items-center justify-between px-3 py-1.5 border-b border-border shrink-0">
+          <div className="px-4 py-1.5 border-b border-border flex items-center justify-between text-xs text-muted-foreground">
             <div className="flex items-center gap-2">
               <div ref={sessionMenuRef} className="relative">
                 <button
@@ -315,10 +315,10 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
             <div className="flex items-center gap-0.5">
               <button
                 onClick={() => void newConversation()}
-                className="p-1 hover:bg-accent rounded text-muted-foreground hover:text-foreground transition-colors"
+                className="p-1.5 hover:bg-accent rounded text-muted-foreground hover:text-foreground transition-colors"
                 title="Nova conversa"
               >
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
                   <path d="M12 20h9" />
                   <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
                 </svg>
@@ -330,31 +330,31 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                       void deleteConversation(activeSession.id);
                     }
                   }}
-                  className="p-1 hover:bg-accent rounded text-muted-foreground hover:text-destructive transition-colors"
+                  className="p-1.5 hover:bg-accent rounded text-muted-foreground hover:text-destructive transition-colors"
                   title="Apagar conversa"
                   aria-label="Apagar conversa"
                 >
-                  <TrashIcon className="w-3.5 h-3.5" />
+                  <TrashIcon className="w-4 h-4" />
                 </button>
               )}
               {messages.length > 2 && !streaming && (
                 <button
                   onClick={() => void compactConversation()}
-                  className="p-1 hover:bg-accent rounded text-muted-foreground hover:text-foreground transition-colors"
+                  className="p-1.5 hover:bg-accent rounded text-muted-foreground hover:text-foreground transition-colors"
                   title="Compactar conversa"
                   aria-label="Compactar conversa"
                 >
-                  <CompressIcon className="w-3.5 h-3.5" />
+                  <CompressIcon className="w-4 h-4" />
                 </button>
               )}
               {onDetach && (
                 <button
                   onClick={onDetach}
-                  className="p-1 hover:bg-accent rounded text-muted-foreground hover:text-foreground transition-colors"
+                  className="p-1.5 hover:bg-accent rounded text-muted-foreground hover:text-foreground transition-colors"
                   title="Desprender para modo flutuante"
                   aria-label="Desprender para modo flutuante"
                 >
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
                     <path d="M15 3h6v6" />
                     <path d="M10 14L21 3" />
                     <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
@@ -364,11 +364,11 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
               {onToggleChat && (
                 <button
                   onClick={onToggleChat}
-                  className="p-1 hover:bg-accent rounded text-muted-foreground hover:text-foreground transition-colors"
+                  className="p-1.5 hover:bg-accent rounded text-muted-foreground hover:text-foreground transition-colors"
                   title="Minimizar chat"
                   aria-label="Minimizar chat"
                 >
-                  <Minus className="w-3.5 h-3.5" />
+                  <Minus className="w-4 h-4" />
                 </button>
               )}
             </div>

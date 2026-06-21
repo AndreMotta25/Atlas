@@ -7,7 +7,7 @@ import {
   DecorationSet,
   WidgetType,
 } from '@codemirror/view';
-import { syntaxTree } from '@codemirror/language';
+import { syntaxTree, ensureSyntaxTree } from '@codemirror/language';
 import type { SyntaxNode, SyntaxNodeRef } from '@lezer/common';
 import { parseAnnotation } from './comment_parser';
 
@@ -194,7 +194,140 @@ function decorateStrikethrough(ref: SyntaxNodeRef, decos: Range<Decoration>[]) {
   }
 }
 
+// ─── Table rendering (GFM) ───────────────────────────────────────
+
+interface ParsedTable {
+  headers: string[];
+  rows: string[][];
+  aligns: ('left' | 'center' | 'right' | null)[];
+}
+
+/** Parse a single delimiter cell (e.g. ":--", "--:", ":-:") into an alignment. */
+function parseDelimiterAlign(s: string): 'left' | 'center' | 'right' | null {
+  const left = s.startsWith(':');
+  const right = s.endsWith(':');
+  if (left && right) return 'center';
+  if (right) return 'right';
+  if (left) return 'left';
+  return null;
+}
+
+/** Walks Table syntax node children and collects plain-text cell contents. */
+function parseTableFromNode(state: EditorState, ref: SyntaxNodeRef): ParsedTable {
+  const headers: string[] = [];
+  const rows: string[][] = [];
+  let aligns: ('left' | 'center' | 'right' | null)[] = [];
+
+  for (const child of iterChildren(ref)) {
+    if (child.name === 'TableHeader') {
+      for (const cell of iterChildren(child)) {
+        if (cell.name === 'TableCell') {
+          headers.push(state.doc.sliceString(cell.from, cell.to).trim());
+        }
+      }
+    } else if (child.name === 'TableRow') {
+      const row: string[] = [];
+      for (const cell of iterChildren(child)) {
+        if (cell.name === 'TableCell') {
+          row.push(state.doc.sliceString(cell.from, cell.to).trim());
+        }
+      }
+      rows.push(row);
+    } else if (child.name === 'TableDelimiter') {
+      const cells: string[] = [];
+      for (const cell of iterChildren(child)) {
+        if (cell.name === 'TableCell') {
+          cells.push(state.doc.sliceString(cell.from, cell.to).trim());
+        }
+      }
+      aligns = cells.map(parseDelimiterAlign);
+    }
+  }
+
+  return { headers, rows, aligns };
+}
+
+/** True if the main selection intersects [from, to] — used to reveal raw markdown for editing. */
+function selectionIntersectsTable(state: EditorState, from: number, to: number): boolean {
+  const sel = state.selection.main;
+  return sel.from <= to && sel.to >= from;
+}
+
+/**
+ * Replaces the whole Table block with a real `<table>` element.
+ * Returns false from ignoreEvent so clicks propagate to CodeMirror,
+ * which positions the cursor inside the table range — at which point
+ * selectionIntersectsTable returns true and decorateTable falls back
+ * to the styled raw-text view, letting the user edit.
+ */
+class TableWidget extends WidgetType {
+  constructor(readonly parsed: ParsedTable) {
+    super();
+  }
+
+  eq(other: TableWidget) {
+    const a = this.parsed;
+    const b = other.parsed;
+    if (a.headers.length !== b.headers.length) return false;
+    if (a.rows.length !== b.rows.length) return false;
+    if (a.aligns.length !== b.aligns.length) return false;
+    for (let i = 0; i < a.headers.length; i++) {
+      if (a.headers[i] !== b.headers[i]) return false;
+      if (a.aligns[i] !== b.aligns[i]) return false;
+    }
+    for (let r = 0; r < a.rows.length; r++) {
+      if (a.rows[r].length !== b.rows[r].length) return false;
+      for (let c = 0; c < a.rows[r].length; c++) {
+        if (a.rows[r][c] !== b.rows[r][c]) return false;
+      }
+    }
+    return true;
+  }
+
+  toDOM() {
+    const { headers, rows, aligns } = this.parsed;
+    const table = document.createElement('table');
+    table.className = 'atlas-rt';
+
+    const thead = document.createElement('thead');
+    const trh = document.createElement('tr');
+    headers.forEach((h, i) => {
+      const th = document.createElement('th');
+      th.className = 'atlas-rt-th';
+      th.textContent = h;
+      const align = aligns[i];
+      if (align) th.style.textAlign = align;
+      trh.appendChild(th);
+    });
+    thead.appendChild(trh);
+    table.appendChild(thead);
+
+    const tbody = document.createElement('tbody');
+    rows.forEach((row) => {
+      const tr = document.createElement('tr');
+      row.forEach((cell, i) => {
+        const td = document.createElement('td');
+        td.className = 'atlas-rt-td';
+        td.textContent = cell;
+        const align = aligns[i];
+        if (align) td.style.textAlign = align;
+        tr.appendChild(td);
+      });
+      tbody.appendChild(tr);
+    });
+    table.appendChild(tbody);
+
+    return table;
+  }
+
+  ignoreEvent() {
+    return false;
+  }
+}
+
 function decorateTable(ref: SyntaxNodeRef, decos: Range<Decoration>[]) {
+  // Mark-based styling for the raw-text view (always applied; visually hidden
+  // when the StateField-provided widget decoration covers this range).
   safeMark('atlas-table', ref.from, ref.to, decos);
   for (const child of iterChildren(ref)) {
     if (child.name === 'TableDelimiter') {
@@ -206,6 +339,77 @@ function decorateTable(ref: SyntaxNodeRef, decos: Range<Decoration>[]) {
     }
   }
 }
+
+/**
+ * Build block-level widget decorations for every Table in the document
+ * whose range does NOT intersect the current selection. Block decorations
+ * can't come from a ViewPlugin (CodeMirror throws), so this runs in a
+ * dedicated StateField. When the cursor is inside a table, no widget is
+ * emitted for it — the ViewPlugin's mark-based styling takes over and the
+ * user sees the raw markdown for editing.
+ */
+function buildTableWidgetDecorations(state: EditorState): DecorationSet {
+  // Force parse up to end of doc with a small timeout. Tables are usually
+  // small and parsing is fast — this ensures newly-typed tables outside the
+  // current viewport get recognized instead of falling back to mark styling.
+  ensureSyntaxTree(state, state.doc.length, 50);
+  const decos: Range<Decoration>[] = [];
+  syntaxTree(state).iterate({
+    enter: (ref) => {
+      if (ref.name !== 'Table') return;
+      if (selectionIntersectsTable(state, ref.from, ref.to)) return;
+      const parsed = parseTableFromNode(state, ref);
+      decos.push(
+        Decoration.replace({
+          widget: new TableWidget(parsed),
+          block: true,
+        }).range(ref.from, ref.to),
+      );
+    },
+  });
+  return Decoration.set(decos, true);
+}
+
+/** StateField providing block-level table widget decorations. */
+export const tableWidgetField = StateField.define<DecorationSet>({
+  create(state) {
+    return buildTableWidgetDecorations(state);
+  },
+  update(value, tr) {
+    const prev = tr.startState.selection.main;
+    const next = tr.selection?.main ?? prev;
+    const selChanged = prev.from !== next.from || prev.to !== next.to;
+    const vpChanged = tr.effects.some((e) => e.is(tableViewportEffect));
+    if (tr.docChanged || selChanged || vpChanged) {
+      return buildTableWidgetDecorations(tr.state);
+    }
+    return value;
+  },
+  provide: (f) => EditorView.decorations.from(f),
+});
+
+/**
+ * Effect dispatched by {@link tableViewportPlugin} when the viewport changes
+ * (scroll / resize / parse completion). The StateField can't observe viewport
+ * directly — it only sees transactions — so we translate viewport updates
+ * into an effect.
+ */
+const tableViewportEffect = StateEffect.define<void>();
+
+/**
+ * ViewPlugin whose only job is to watch for viewport changes and notify the
+ * StateField. Without this, scrolling a new table into view wouldn't rebuild
+ * the widget — only the ViewPlugin's mark-based styling would update.
+ */
+export const tableViewportPlugin = ViewPlugin.fromClass(
+  class {
+    update(u: ViewUpdate) {
+      if (u.viewportChanged) {
+        u.view.dispatch({ effects: tableViewportEffect.of() });
+      }
+    }
+  },
+);
 
 function decorateTaskList(state: EditorState, ref: SyntaxNodeRef, decos: Range<Decoration>[]) {
   for (const child of iterChildren(ref)) {
