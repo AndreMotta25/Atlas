@@ -12,11 +12,11 @@
 [x] - Mudar a ordem dos cards do agent,quando peço para ele buscar uma pagina, ele acha a pagina me trás a resposta e só depois vem o card dizendo que leu a pagina e pesquisou nela. O certo era para esse ultimo vir primeiro e depois a resposta neh. - [facil]
 [x] - Tornar possivel compactar a conversa com o atlas para gastar menos token - [médio].
 [] - Tornar possivel exportar a pagina em pdf. - [medio]
-[] - Fazer uma pagina home que tenha o chat com o atlas logo na entrada. - [medio]
-[] - um icone de home que fica do lado do icone de pasta, o icone home tem que levar para a pagina home. - [facil]
+[x] - Fazer uma pagina home que tenha o chat com o atlas logo na entrada. - [medio]
+[x] - um icone de home que fica do lado do icone de pasta, o icone home tem que levar para a pagina home. - [facil]
 [] - Uma barra de pesquisa que fica no meio da tela no topo da pagina, na parte que ficam as opçoes do devtools do electron. - [medio]
 [x] - Quando selecionar o texto, as opçoes tem que aparecer automaticamente - [facil].
-[x] - [Revisar] - Tem que ser possivel mudar a cor de fundo do texto(sublinhar). - [facil]
+[x] - Tem que ser possivel mudar a cor de fundo do texto(sublinhar). - [facil]
 [x] - Porque todo titulo fica com um underline em baixo - [facil].
 [x] - Verificar se o formatar markdown funciona corretamente. - [facil]
 [x] - Transformar o botão de comentario em toggle - [facil].
@@ -35,3 +35,7 @@
 [x] - revisar o prompt do atlas com o glm 5.2
 [x] - Quando iniciar a aplicação o editor deve estar bloqueado até que um arquivo seja criado ou selecionado(aberto).
 [x] - Permitir que o modelo faça buscas na internet
+[x] - Colocar um botão no chat do atlas para mover ele.
+[x] - No atlas já tem um botão para transformar ele em uma bola que fica na parte inferior da tela, mas acho que seria interesante ter um botão que desprendesse o atlas da pagina, tipo, ficar flutuando e tomando conta da tela.
+[ ] - Colocar um login com conta externa para salvar os arquivos online - Drive.
+[ ] - Colocar o sistema de grafos.
