@@ -1,17 +1,17 @@
-import type { Configuration } from 'webpack';
+import type { Configuration } from "webpack";
 
-import { rules } from './webpack.rules';
-import { plugins } from './webpack.plugins';
+import { rules } from "./webpack.rules";
+import { plugins } from "./webpack.plugins";
 
 export const mainConfig: Configuration = {
   /**
    * This is the main entry point for your application, it's the first file
    * that runs in the main process.
    */
-  entry: './src/index.ts',
+  entry: "./src/index.ts",
   // Native modules must not be bundled — resolve at runtime from node_modules.
   externals: {
-    'better-sqlite3': 'commonjs better-sqlite3',
+    //  'better-sqlite3': 'commonjs better-sqlite3',
   },
   // Put your normal webpack config below here
   module: {
@@ -19,6 +19,6 @@ export const mainConfig: Configuration = {
   },
   plugins,
   resolve: {
-    extensions: ['.js', '.ts', '.jsx', '.tsx', '.css', '.json'],
+    extensions: [".js", ".ts", ".jsx", ".tsx", ".css", ".json"],
   },
 };

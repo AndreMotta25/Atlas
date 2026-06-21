@@ -4,7 +4,7 @@ import ReactRefreshWebpackPlugin from '@pmmmwh/react-refresh-webpack-plugin';
 import { rules } from './webpack.rules';
 import { plugins } from './webpack.plugins';
 
-const isDev = process.env.NODE_ENV !== 'production';
+const isDev = process.env.NODE_ENV === 'development';
 
 export const rendererConfig: Configuration = {
   devtool: 'inline-source-map',

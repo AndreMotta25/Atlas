@@ -1,8 +1,10 @@
 import type { ModuleOptions } from 'webpack';
 
-const isDev = process.env.NODE_ENV !== 'production';
-// react-refresh-typescript transformer is a no-op for non-React files,
-// so it's safe to apply to the shared ts-loader rule (also used by main process).
+// Only enable React Refresh when explicitly in development.
+// `electron-forge package`/`make` do NOT set NODE_ENV, so checking
+// `!== 'production'` would wrongly treat the packaged build as dev and
+// inject $RefreshSig$ calls without the matching runtime -> ReferenceError.
+const isDev = process.env.NODE_ENV === 'development';
 const reactRefreshTransformer = isDev
   ? // eslint-disable-next-line @typescript-eslint/no-var-requires
     require('react-refresh-typescript').default()

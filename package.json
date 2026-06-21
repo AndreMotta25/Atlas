@@ -6,10 +6,10 @@
   "main": ".webpack/main",
   "private": true,
   "scripts": {
-    "start": "electron-forge start",
-    "package": "electron-forge package",
-    "make": "electron-forge make",
-    "publish": "electron-forge publish",
+    "start": "cross-env NODE_ENV=development electron-forge start",
+    "package": "cross-env NODE_ENV=production electron-forge package",
+    "make": "cross-env NODE_ENV=production electron-forge make",
+    "publish": "cross-env NODE_ENV=production electron-forge publish",
     "lint": "eslint --ext .ts,.tsx ."
   },
   "keywords": [],
@@ -36,6 +36,7 @@
     "@typescript-eslint/eslint-plugin": "^5.62.0",
     "@typescript-eslint/parser": "^5.62.0",
     "@vercel/webpack-asset-relocator-loader": "^1.7.3",
+    "cross-env": "^7.0.3",
     "css-loader": "^6.11.0",
     "electron": "42.4.1",
     "eslint": "^8.57.1",
