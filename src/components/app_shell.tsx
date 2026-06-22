@@ -652,11 +652,13 @@ export const AppShell: React.FC = () => {
       {sidebarVisible && <ResizeHandle onStart={() => { resizeRef.current = 'sidebar'; }} />}
 
       <main className="overflow-hidden flex flex-col flex-1">
-        {viewingGraph ? (
-          <GraphView />
-        ) : viewingHome ? (
-          <HomeView />
-        ) : (
+        {/* EditorPane is always mounted to avoid destroying/recreating the
+            CodeMirror EditorView on every Home ↔ Editor navigation.
+            Recreating the editor right after HomeView (which holds a focused
+            textarea) unmounts triggers a Chromium hit-testing bug where the
+            new contenteditable doesn't respond to clicks until a window
+            resize/visibility change forces a reflow. */}
+        <div className={viewingGraph || viewingHome ? 'hidden' : 'flex flex-col h-full'}>
           <EditorPane
             onCommentsChange={setComments}
             onCommentSelect={handleCommentSelect}
@@ -667,7 +669,9 @@ export const AppShell: React.FC = () => {
             onSetTab={setChatTab}
             commentCount={comments.length}
           />
-        )}
+        </div>
+        {viewingGraph && <GraphView />}
+        {viewingHome && <HomeView />}
       </main>
 
       {chatMode === 'panel' && !viewingHome && !viewingGraph && <ResizeHandle onStart={() => { resizeRef.current = 'chat'; }} />}

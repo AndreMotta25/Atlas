@@ -6,6 +6,7 @@ import { ContextMenu } from '../editor/context_menu';
 import type { MenuEntry } from '../editor/context_menu';
 import type { VaultTree } from '../../types';
 import { createNewPage, createNewFolder } from '../../lib/vault_utils';
+import { useConfirm } from '../confirm_dialog';
 import { FileIcon, FolderIcon, FolderOpen, FolderPlus, SendIcon } from '../icons';
 
 interface TreeNodeProps {
@@ -214,6 +215,8 @@ export const FileTree: React.FC = () => {
   const openPage = useVaultStore((s) => s.openPage);
   const currentPath = useVaultStore((s) => s.currentPath);
 
+  const { confirm, dialog: confirmDialog } = useConfirm();
+
   const [dragPath, setDragPath] = useState<string | null>(null);
   const [dropTarget, setDropTarget] = useState<string | null>(null);
   const [ctxMenu, setCtxMenu] = useState<ContextMenuState | null>(null);
@@ -290,7 +293,13 @@ export const FileTree: React.FC = () => {
     const path = ctxMenu.path;
     setCtxMenu(null);
     const name = path.split('/').pop() || path;
-    if (!window.confirm(`Tem certeza que deseja apagar "${name}"?`)) return;
+    const ok = await confirm({
+      title: 'Apagar página',
+      message: `Tem certeza que deseja apagar "${name}"? Essa ação não pode ser desfeita.`,
+      confirmLabel: 'Apagar',
+      danger: true,
+    });
+    if (!ok) return;
     try {
       await api.vault.delete(path);
       await loadTree();
@@ -390,6 +399,8 @@ export const FileTree: React.FC = () => {
           onClose={() => setCtxMenu(null)}
         />
       )}
+
+      {confirmDialog}
     </div>
   );
 };

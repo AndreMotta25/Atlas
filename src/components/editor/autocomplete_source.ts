@@ -1,4 +1,5 @@
 import type { CompletionContext, CompletionResult } from '@codemirror/autocomplete';
+import type { EditorView } from '@codemirror/view';
 import { useVaultStore } from '../../stores/vault_store';
 import type { VaultTree } from '../../types';
 
@@ -39,7 +40,16 @@ function wikiLinkSource(ctx: CompletionContext): CompletionResult | null {
     options: filtered.map((p) => ({
       label: p,
       type: 'page' as const,
-      apply: `${p}]]`,
+      apply: (view: EditorView, _completion, from, to) => {
+        const doc = view.state.doc;
+        const after = doc.sliceString(to, Math.min(to + 2, doc.length));
+        const hasClose = after.startsWith(']]');
+        const insert = hasClose ? p : `${p}]]`;
+        view.dispatch({
+          changes: { from, to, insert },
+          selection: { anchor: from + p.length },
+        });
+      },
     })),
     validFor: /^[^\]\n]*$/,
   };

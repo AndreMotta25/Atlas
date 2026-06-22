@@ -37,6 +37,7 @@ import { markdownFoldService } from './markdown_fold';
 import { stickyHeaderPlugin } from './sticky_header';
 import { ContextMenu, type MenuEntry } from './context_menu';
 import { CommentPopup } from './comment_popup';
+import { useConfirm } from '../confirm_dialog';
 import {
   findComments,
   serializeAnnotation,
@@ -98,6 +99,8 @@ export const EditorPane: React.FC<EditorPaneProps> = ({ onCommentsChange, onComm
   const streaming = useChatStore((s) => s.streaming);
   const sendChat = useChatStore((s) => s.send);
   const cancelChat = useChatStore((s) => s.cancel);
+
+  const { confirm, dialog: confirmDialog } = useConfirm();
 
   const [chatInput, setChatInput] = useState('');
 
@@ -241,13 +244,14 @@ export const EditorPane: React.FC<EditorPaneProps> = ({ onCommentsChange, onComm
         console.log('[WikiLink] pos:', pos, 'context:', JSON.stringify(doc.slice(Math.max(0, pos - 30), pos + 30)));
 
         // Search backwards for [[ (with limit to avoid scanning whole doc)
-        let from = pos;
-        const backLimit = Math.max(0, pos - 500);
-        while (from > backLimit && doc[from] !== '[') from--;
-        console.log('[WikiLink] backward search found "[" at:', from, 'prev char:', JSON.stringify(doc[from - 1]));
-        // Verify it's actually [[ (double open bracket)
-        if (from < 1 || doc[from - 1] !== '[' || doc[from] !== '[') {
-          console.log('[WikiLink] not a wiki-link (no [[ found)');
+        let from = -1;
+        {
+          let i = pos;
+          const backLimit = Math.max(0, pos - 500);
+          while (i > backLimit && doc[i] !== '[') i--;
+          if (i > backLimit && doc[i] === '[') from = i;
+        }
+        if (from < 1 || doc[from - 1] !== '[') {
           from = -1; // not a wiki-link
         } else {
           from--; // point to the FIRST '[' of the [[ pair
@@ -256,16 +260,11 @@ export const EditorPane: React.FC<EditorPaneProps> = ({ onCommentsChange, onComm
         // Search forwards for ]] — only if [[ was found
         let to = -1;
         if (from >= 0) {
-          to = from + 2; // start after [[
-          const fwdLimit = Math.min(doc.length, to + 500);
-          while (to < fwdLimit && doc[to] !== ']') to++;
-          console.log('[WikiLink] forward search found "]" at:', to, 'next char:', JSON.stringify(doc[to + 1]));
-          // Verify it's ]] (double close bracket)
-          if (to >= doc.length - 1 || doc[to] !== ']' || doc[to + 1] !== ']') {
-            console.log('[WikiLink] no matching ]] found');
-            to = -1; // no matching ]]
-          } else {
-            to += 2; // point after ]]
+          let i = from + 2; // start after [[
+          const fwdLimit = Math.min(doc.length, i + 500);
+          while (i < fwdLimit && doc[i] !== ']') i++;
+          if (i < fwdLimit && doc[i] === ']' && doc[i + 1] === ']') {
+            to = i + 2; // point after ]]
           }
         }
 
@@ -475,6 +474,19 @@ export const EditorPane: React.FC<EditorPaneProps> = ({ onCommentsChange, onComm
     setLiveDoc(currentContent);
   }, [currentPath, currentContent]);
 
+  // Focus the editor when a page is opened. Deferred to the next animation
+  // frame so the content dispatch (from the effect above) has already applied
+  // and the editor is fully laid out before receiving focus.
+  useEffect(() => {
+    if (!currentPath) return;
+    const view = viewRef.current;
+    if (!view) return;
+    const raf = requestAnimationFrame(() => {
+      if (viewRef.current === view) view.focus();
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [currentPath]);
+
   const addComment = () => {
     const view = viewRef.current;
     if (!view) return;
@@ -585,7 +597,13 @@ export const EditorPane: React.FC<EditorPaneProps> = ({ onCommentsChange, onComm
   const handleDelete = async () => {
     if (!currentPath) return;
     const name = currentPath.split('/').pop() || currentPath;
-    if (!window.confirm(`Tem certeza que deseja apagar "${name}"?`)) return;
+    const ok = await confirm({
+      title: 'Apagar página',
+      message: `Tem certeza que deseja apagar "${name}"? Essa ação não pode ser desfeita.`,
+      confirmLabel: 'Apagar',
+      danger: true,
+    });
+    if (!ok) return;
     try {
       await api.vault.delete(currentPath);
       useVaultStore.setState({ currentPath: null, currentContent: '', dirty: false });
@@ -951,6 +969,8 @@ export const EditorPane: React.FC<EditorPaneProps> = ({ onCommentsChange, onComm
           onDelete={deleteFromEdit}
         />
       )}
+
+      {confirmDialog}
     </div>
   );
 };
