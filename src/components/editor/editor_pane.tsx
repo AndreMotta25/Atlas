@@ -224,13 +224,81 @@ export const EditorPane: React.FC<EditorPaneProps> = ({ onCommentsChange, onComm
     });
   };
 
-  // Click handler for highlights → notify parent
+  // Click handler for highlights and wiki-links
   useEffect(() => {
     const view = viewRef.current;
     if (!view) return;
 
     const handleClick = (e: MouseEvent) => {
       const target = e.target as HTMLElement;
+
+      // Wiki-link click → find [[...]] in document text around click position
+      // We use posAtCoords instead of DOM textContent because CodeMirror
+      // may have removed the live-preview decoration before this handler runs.
+      const pos = view.posAtCoords({ x: e.clientX, y: e.clientY }, false);
+      if (pos != null) {
+        const doc = view.state.doc.toString();
+        console.log('[WikiLink] pos:', pos, 'context:', JSON.stringify(doc.slice(Math.max(0, pos - 30), pos + 30)));
+
+        // Search backwards for [[ (with limit to avoid scanning whole doc)
+        let from = pos;
+        const backLimit = Math.max(0, pos - 500);
+        while (from > backLimit && doc[from] !== '[') from--;
+        console.log('[WikiLink] backward search found "[" at:', from, 'prev char:', JSON.stringify(doc[from - 1]));
+        // Verify it's actually [[ (double open bracket)
+        if (from < 1 || doc[from - 1] !== '[' || doc[from] !== '[') {
+          console.log('[WikiLink] not a wiki-link (no [[ found)');
+          from = -1; // not a wiki-link
+        } else {
+          from--; // point to the FIRST '[' of the [[ pair
+        }
+
+        // Search forwards for ]] — only if [[ was found
+        let to = -1;
+        if (from >= 0) {
+          to = from + 2; // start after [[
+          const fwdLimit = Math.min(doc.length, to + 500);
+          while (to < fwdLimit && doc[to] !== ']') to++;
+          console.log('[WikiLink] forward search found "]" at:', to, 'next char:', JSON.stringify(doc[to + 1]));
+          // Verify it's ]] (double close bracket)
+          if (to >= doc.length - 1 || doc[to] !== ']' || doc[to + 1] !== ']') {
+            console.log('[WikiLink] no matching ]] found');
+            to = -1; // no matching ]]
+          } else {
+            to += 2; // point after ]]
+          }
+        }
+
+        if (from >= 0 && to > from) {
+          const inner = doc.slice(from + 2, to - 2); // strip [[ and ]]
+          console.log('[WikiLink] inner:', JSON.stringify(inner));
+          // Handle aliases: [[display|page]] → page, [[page#heading]] → page
+          let pageName = inner;
+          if (inner.includes('|')) {
+            pageName = inner.split('|')[1] || inner.split('|')[0];
+          }
+          if (pageName.includes('#')) {
+            pageName = pageName.split('#')[0];
+          }
+          const trimmed = pageName.trim();
+          console.log('[WikiLink] final pageName:', JSON.stringify(trimmed));
+          if (trimmed) {
+            const relPath = trimmed.endsWith('.md') ? trimmed : `${trimmed}.md`;
+            void (async () => {
+              const exists = await api.vault.exists(relPath);
+              console.log('[WikiLink] exists:', relPath, exists);
+              if (!exists) {
+                await api.vault.writePage(relPath, '');
+                await useVaultStore.getState().loadTree();
+              }
+              void useVaultStore.getState().openPage(relPath);
+            })();
+            return;
+          }
+        }
+      }
+
+      // Highlight/comment click → open edit popup
       const highlight = target.closest('.atlas-highlight') as HTMLElement | null;
       if (!highlight) return;
       try {
