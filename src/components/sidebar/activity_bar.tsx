@@ -1,7 +1,7 @@
 import React from 'react';
-import { ProjectsIcon, SearchActivityIcon, GearActivityIcon, HomeIcon, AtlasActivityIcon, TagActivityIcon } from '../icons';
+import { ProjectsIcon, SearchActivityIcon, GearActivityIcon, HomeIcon, AtlasActivityIcon, TagActivityIcon, LinkActivityIcon } from '../icons';
 
-export type ActivityId = 'projects' | 'search' | 'tags' | 'settings' | 'atlas';
+export type ActivityId = 'projects' | 'search' | 'tags' | 'backlinks' | 'settings' | 'atlas';
 
 interface ActivityEntry {
   id: ActivityId;
@@ -13,6 +13,7 @@ const ACTIVITIES: ActivityEntry[] = [
   { id: 'projects', icon: ProjectsIcon, label: 'Projetos' },
   { id: 'search', icon: SearchActivityIcon, label: 'Pesquisar' },
   { id: 'tags', icon: TagActivityIcon, label: 'Tags' },
+  { id: 'backlinks', icon: LinkActivityIcon, label: 'Backlinks' },
   { id: 'settings', icon: GearActivityIcon, label: 'Configurações' },
   { id: 'atlas', icon: AtlasActivityIcon, label: 'Atlas' },
 ];

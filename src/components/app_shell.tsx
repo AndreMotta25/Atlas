@@ -3,6 +3,7 @@ import { FileTree } from './sidebar/file_tree';
 import { ActivityBar } from './sidebar/activity_bar';
 import type { ActivityId } from './sidebar/activity_bar';
 import { TagsPanel } from './sidebar/tags_panel';
+import { BacklinksPanel } from './sidebar/backlinks_panel';
 import { EditorPane } from './editor/editor_pane';
 import { ChatPanel } from './chat/chat_panel';
 import { SettingsModal } from './settings/settings_modal';
@@ -456,6 +457,11 @@ export const AppShell: React.FC = () => {
       case 'tags':
         return (
           <TagsPanel onBack={() => setSidebarVisible(false)} />
+        );
+
+      case 'backlinks':
+        return (
+          <BacklinksPanel onBack={() => setSidebarVisible(false)} />
         );
 
       case 'settings':
