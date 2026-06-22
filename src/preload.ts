@@ -9,6 +9,7 @@ import type {
   ChatSearchResult,
   ChatSession,
   ChatStreamChunk,
+  GraphData,
   PageContent,
   PendingToolCall,
   SearchResult,
@@ -94,6 +95,8 @@ const electronAPI = {
       ipcRenderer.invoke(createChannel('vault', 'tags')),
     pagesByTag: (tag: string): Promise<TagPageResult[]> =>
       ipcRenderer.invoke(createChannel('vault', 'pages-by-tag'), tag),
+    graph: (): Promise<GraphData> =>
+      ipcRenderer.invoke(createChannel('vault', 'graph')),
   },
 
   // ── Chat sessions (persistence) ──

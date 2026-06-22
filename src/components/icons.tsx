@@ -318,6 +318,17 @@ export const LinkActivityIcon: React.FC<IconProps> = ({ className = 'w-5 h-5' })
   </svg>
 );
 
+export const GraphActivityIcon: React.FC<IconProps> = ({ className = 'w-5 h-5' }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <circle cx="5" cy="6" r="2" />
+    <circle cx="19" cy="6" r="2" />
+    <circle cx="12" cy="18" r="2" />
+    <line x1="6.5" y1="7" x2="17.5" y2="7" />
+    <line x1="6" y1="7.5" x2="11" y2="16.5" />
+    <line x1="18" y1="7.5" x2="13" y2="16.5" />
+  </svg>
+);
+
 export const LoadingSpinner: React.FC<IconProps> = ({ className = 'w-6 h-6' }) => (
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`${className} animate-spin`}>
     <path d="M21 12a9 9 0 1 1-6.219-8.56" />

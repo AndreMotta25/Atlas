@@ -2,7 +2,7 @@ import Database from 'better-sqlite3';
 import type { Database as DB } from 'better-sqlite3';
 import { app } from 'electron';
 import * as path from 'path';
-import type { BacklinkResult, ChatMessage, ChatSearchResult, ChatSession, SearchResult, TagResult, TagPageResult } from '../types';
+import type { BacklinkResult, ChatMessage, ChatSearchResult, ChatSession, GraphData, GraphEdge, GraphNode, SearchResult, TagResult, TagPageResult } from '../types';
 
 /**
  * SQLite layer for the Atlas vault index.
@@ -298,6 +298,47 @@ class DatabaseServiceClass {
       fromTitle: r.fromTitle ?? r.fromPath,
       anchor: r.anchor,
     }));
+  }
+
+  /**
+   * Full graph of pages and the wiki-links between them. Used by the graph view.
+   *
+   * - Nodes: every indexed page, with `degree` = count of links in + out.
+   * - Edges: one per link whose target resolves to an existing page.
+   *   `links.to_path` is lowercased by the indexer (see normalizeTarget),
+   *   so the join uses `LOWER(p.path)` to match case-insensitively.
+   *   Links pointing at non-existing pages (dangling wiki-links) are dropped.
+   */
+  getGraph(): GraphData {
+    const db = this.requireOpen();
+    const nodeRows = db.prepare(`
+      SELECT id, path, title,
+        (SELECT COUNT(*) FROM links l WHERE l.from_page = p.id) AS out_deg,
+        (SELECT COUNT(*) FROM links l WHERE l.to_path = LOWER(p.path)) AS in_deg
+      FROM pages p
+      ORDER BY id
+    `).all() as Array<{ id: number; path: string; title: string | null; out_deg: number; in_deg: number }>;
+
+    const nodes: GraphNode[] = nodeRows.map((r) => ({
+      id: r.id,
+      path: r.path,
+      title: r.title ?? r.path,
+      degree: r.out_deg + r.in_deg,
+    }));
+
+    const edgeRows = db.prepare(`
+      SELECT l.from_page AS source, p.id AS target
+      FROM links l
+      JOIN pages p ON LOWER(p.path) = l.to_path
+      WHERE p.id IS NOT NULL AND l.from_page <> p.id
+    `).all() as Array<{ source: number; target: number }>;
+
+    const edges: GraphEdge[] = edgeRows.map((r) => ({
+      source: r.source,
+      target: r.target,
+    }));
+
+    return { nodes, edges };
   }
 
   // ── Chat sessions / messages ──────────────────────────────────

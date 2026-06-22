@@ -1,7 +1,7 @@
 import { ipcMain } from 'electron';
 import { createChannel } from '../types';
 import { DatabaseService } from '../vault/db';
-import type { BacklinkResult, SearchResult, TagResult, TagPageResult } from '../types';
+import type { BacklinkResult, GraphData, SearchResult, TagResult, TagPageResult } from '../types';
 
 export const registerSearchHandlers = (): void => {
   // Content search over the FTS5 index. Instant + free (no LLM call).
@@ -51,6 +51,18 @@ export const registerSearchHandlers = (): void => {
         return DatabaseService.getPagesByTag(tag);
       } catch {
         return [];
+      }
+    },
+  );
+
+  // Full graph of pages + resolved links (used by the graph view).
+  ipcMain.handle(
+    createChannel('vault', 'graph'),
+    async (): Promise<GraphData> => {
+      try {
+        return DatabaseService.getGraph();
+      } catch {
+        return { nodes: [], edges: [] };
       }
     },
   );

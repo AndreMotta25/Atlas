@@ -239,6 +239,28 @@ export interface TagPageResult {
   title: string;
 }
 
+// ─── Graph Types ────────────────────────────────────────────
+export interface GraphNode {
+  /** pages.id — used as the node identifier by the graph lib. */
+  id: number;
+  path: string;
+  title: string;
+  /** Number of links in+out, used to scale the node radius. */
+  degree: number;
+}
+
+export interface GraphEdge {
+  /** pages.id of the page that owns the link. */
+  source: number;
+  /** pages.id of the referenced page. */
+  target: number;
+}
+
+export interface GraphData {
+  nodes: GraphNode[];
+  edges: GraphEdge[];
+}
+
 // ─── Chat Session Types ────────────────────────────────────────
 export interface ChatSession {
   id: string;

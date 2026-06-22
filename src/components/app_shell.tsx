@@ -8,6 +8,7 @@ import { EditorPane } from './editor/editor_pane';
 import { ChatPanel } from './chat/chat_panel';
 import { SettingsModal } from './settings/settings_modal';
 import { HomeView } from './home/home_view';
+import { GraphView } from './graph/graph_view';
 import { useVaultStore } from '../stores/vault_store';
 import { useChatStore } from '../stores/chat_store';
 import { useTheme } from '../hooks/use_theme';
@@ -71,10 +72,17 @@ export const AppShell: React.FC = () => {
   // Whether the Home view is shown instead of the editor.
   const currentPath = useVaultStore((s) => s.currentPath);
   const [viewingHome, setViewingHome] = useState(true);
+  // Graph view takes over the main canvas (same priority as Home).
+  const [viewingGraph, setViewingGraph] = useState(false);
 
   // Opening any page leaves the Home view.
   useEffect(() => {
     if (currentPath !== null) setViewingHome(false);
+  }, [currentPath]);
+
+  // Entering the editor also leaves the Graph view.
+  useEffect(() => {
+    if (currentPath !== null) setViewingGraph(false);
   }, [currentPath]);
 
   // Overlay drag position (offset from top-left of the viewport).
@@ -200,6 +208,16 @@ export const AppShell: React.FC = () => {
       setSettingsOpen(true);
       return;
     }
+    if (id === 'graph') {
+      // Graph view takes over the main canvas — sidebar not used.
+      setActiveActivity(id);
+      setViewingGraph(true);
+      setViewingHome(false);
+      setSidebarVisible(false);
+      return;
+    }
+    // Any other activity leaves graph mode.
+    if (viewingGraph) setViewingGraph(false);
     if (id === activeActivity) {
       // Toggle sidebar off when clicking the active icon (VS Code behavior)
       setSidebarVisible((v) => !v);
@@ -612,6 +630,7 @@ export const AppShell: React.FC = () => {
         homeActive={viewingHome}
         onHome={() => {
           setViewingHome(true);
+          setViewingGraph(false);
           // Clear conversation view without tearing down IPC listeners
           // (reset() would unsubscribe ai:token and break the next stream).
           useChatStore.setState({
@@ -633,7 +652,9 @@ export const AppShell: React.FC = () => {
       {sidebarVisible && <ResizeHandle onStart={() => { resizeRef.current = 'sidebar'; }} />}
 
       <main className="overflow-hidden flex flex-col flex-1">
-        {viewingHome ? (
+        {viewingGraph ? (
+          <GraphView />
+        ) : viewingHome ? (
           <HomeView />
         ) : (
           <EditorPane
@@ -649,9 +670,9 @@ export const AppShell: React.FC = () => {
         )}
       </main>
 
-      {chatMode === 'panel' && !viewingHome && <ResizeHandle onStart={() => { resizeRef.current = 'chat'; }} />}
+      {chatMode === 'panel' && !viewingHome && !viewingGraph && <ResizeHandle onStart={() => { resizeRef.current = 'chat'; }} />}
 
-      {chatMode === 'panel' && !viewingHome ? (
+      {chatMode === 'panel' && !viewingHome && !viewingGraph ? (
         <aside className="border-l border-border overflow-hidden" style={{ width: chatWidth, minWidth: MIN_CHAT }}>
           <ChatPanel
             chatTab={chatTab}
