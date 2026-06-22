@@ -13,44 +13,45 @@ export const BacklinksPanel: React.FC<BacklinksPanelProps> = ({ onBack }) => {
   const openPage = useVaultStore((s) => s.openPage);
   const [backlinks, setBacklinks] = useState<BacklinkResult[]>([]);
   const [loading, setLoading] = useState(true);
-  const backlinksRequestRef = useRef(0);
+  // Path da requisição em andamento. Usado para ignorar respostas de paths
+  // antigos (navegação rápida) sem travar o loading em caso de sobreposição.
+  const inflightPathRef = useRef<string | null>(null);
+
+  // Fetch centralizado. `showLoading` distingue carga inicial (spinner) de
+  // refresh silencioso quando o vault muda em segundo plano.
+  const fetchBacklinks = useCallback((target: string, showLoading: boolean) => {
+    inflightPathRef.current = target;
+    if (showLoading) setLoading(true);
+    api.vault.backlinks(target).then((result) => {
+      if (inflightPathRef.current !== target) return;
+      setBacklinks(result);
+      setLoading(false);
+    }).catch((err) => {
+      console.error('[BacklinksPanel] Failed to load backlinks:', err);
+      if (inflightPathRef.current === target) setLoading(false);
+    });
+  }, []);
 
   useEffect(() => {
     if (!currentPath) {
+      inflightPathRef.current = null;
       setBacklinks([]);
       setLoading(false);
       return;
     }
-    const reqId = ++backlinksRequestRef.current;
-    setLoading(true);
-    api.vault.backlinks(currentPath).then((result) => {
-      if (reqId === backlinksRequestRef.current) {
-        setBacklinks(result);
-        setLoading(false);
-      }
-    }).catch((err) => {
-      console.error('[BacklinksPanel] Failed to load backlinks:', err);
-      if (reqId === backlinksRequestRef.current) setLoading(false);
-    });
-  }, [currentPath]);
+    fetchBacklinks(currentPath, true);
+  }, [currentPath, fetchBacklinks]);
 
   // Refresh backlinks when vault files change
   useEffect(() => {
     if (!currentPath) return;
     const unsub = api.vault.onChanged((evt) => {
       if (evt.type === 'add' || evt.type === 'change' || evt.type === 'unlink') {
-        const reqId = ++backlinksRequestRef.current;
-        api.vault.backlinks(currentPath).then((result) => {
-          if (reqId === backlinksRequestRef.current) {
-            setBacklinks(result);
-          }
-        }).catch((err) => {
-          console.error('[BacklinksPanel] Failed to refresh backlinks:', err);
-        });
+        fetchBacklinks(currentPath, false);
       }
     });
     return unsub;
-  }, [currentPath]);
+  }, [currentPath, fetchBacklinks]);
 
   const handleOpenPage = useCallback(async (path: string) => {
     try {
@@ -78,7 +79,7 @@ export const BacklinksPanel: React.FC<BacklinksPanelProps> = ({ onBack }) => {
           </span>
         </div>
         <span className="text-[10px] text-muted-foreground/60 shrink-0">
-          {backlinks.length}
+          {loading ? '…' : backlinks.length}
         </span>
       </div>
 
@@ -123,7 +124,7 @@ export const BacklinksPanel: React.FC<BacklinksPanelProps> = ({ onBack }) => {
                   </span>
                   {b.anchor && (
                     <span className="text-[10px] text-muted-foreground/60 block mt-0.5">
-                      âncora: <code className="text-muted-foreground font-mono">#{b.anchor}</code>
+                      seção: <code className="text-muted-foreground font-mono">#{b.anchor}</code>
                     </span>
                   )}
                 </div>

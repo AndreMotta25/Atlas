@@ -68,15 +68,15 @@ const parsePage = (content: string): ParsedPage => {
       const linkRe = new RegExp(WIKI_LINK_RE.source, 'g');
       while ((m = linkRe.exec(stripped)) !== null) {
         const raw = m[1];
-        // Split target | alias
+        // Split target | alias — alias afeta apenas a exibição, não o destino.
         const pipeIdx = raw.indexOf('|');
         const targetPart = pipeIdx >= 0 ? raw.slice(0, pipeIdx) : raw;
-        const alias = pipeIdx >= 0 ? raw.slice(pipeIdx + 1).trim() : null;
-        // Split target # heading
+        // Split target # heading — o heading vira o `anchor` (link para seção).
         const hashIdx = targetPart.indexOf('#');
         const target = (hashIdx >= 0 ? targetPart.slice(0, hashIdx) : targetPart).trim();
+        const heading = hashIdx >= 0 ? targetPart.slice(hashIdx + 1).trim() : null;
         if (!target) continue;
-        links.push({ toPath: normalizeTarget(target), anchor: alias });
+        links.push({ toPath: normalizeTarget(target), anchor: heading });
       }
 
       const tagRe = new RegExp(TAG_RE.source, 'gu');
@@ -90,7 +90,8 @@ const parsePage = (content: string): ParsedPage => {
 };
 
 /**
- * Normalize a wiki-link target to a vault-relative `.md` path.
+ * Normalize a wiki-link target to a vault-relative `.md` path, lowercased
+ * so that `[[Notas]]` and `[[notas]]` resolve to the same backlink target.
  *   - "Notas"            → "notas.md"
  *   - "pasta/Notas"      → "pasta/notas.md"
  *   - "../Outra"         → "outra.md"   (parent ref collapsed — best-effort)
@@ -101,7 +102,7 @@ const normalizeTarget = (target: string): string => {
   // Collapse any parent-directory segments to keep things sane.
   t = t.replace(/\.\.\//g, '').replace(/\.\.\\g/, '');
   if (!/\.md$/i.test(t)) t += '.md';
-  return t;
+  return t.toLowerCase();
 };
 
 class IndexerClass {

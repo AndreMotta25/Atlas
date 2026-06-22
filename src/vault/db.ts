@@ -273,9 +273,12 @@ class DatabaseServiceClass {
   /** Pages whose links point at `targetPath` (resolved against vault root). */
   getBacklinks(targetPath: string): BacklinkResult[] {
     const db = this.requireOpen();
-    // Backlinks match on the target path, both with and without the .md extension,
-    // since wiki-links are commonly written without it ([[notas]] → notas.md).
-    const bare = targetPath.replace(/\.md$/i, '');
+    // Links are stored lowercased by the indexer (see normalizeTarget), so the
+    // comparison must lowercase the input too — otherwise [[Notas]] would miss
+    // backlinks to notas.md. Both with/without .md are tried because wiki-links
+    // are commonly written without the extension.
+    const normalized = targetPath.toLowerCase();
+    const bare = normalized.replace(/\.md$/i, '');
     const rows = db.prepare(`
       SELECT
         pf.path  AS fromPath,
@@ -285,7 +288,7 @@ class DatabaseServiceClass {
       JOIN pages pf ON pf.id = l.from_page
       WHERE l.to_path = ? OR l.to_path = ?
       ORDER BY pf.path
-    `).all(targetPath, bare) as Array<{
+    `).all(normalized, bare) as Array<{
       fromPath: string;
       fromTitle: string | null;
       anchor: string | null;
