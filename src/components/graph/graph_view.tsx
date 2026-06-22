@@ -1,9 +1,15 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import ForceGraph2D from 'react-force-graph-2d';
-import { api } from '../../lib/api';
-import { useVaultStore } from '../../stores/vault_store';
-import { SpinnerIcon, LinkIcon } from '../icons';
-import type { GraphData } from '../../types';
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import ForceGraph2D from "react-force-graph-2d";
+import { api } from "../../lib/api";
+import { useVaultStore } from "../../stores/vault_store";
+import { SpinnerIcon, LinkIcon } from "../icons";
+import type { GraphData } from "../../types";
 
 /**
  * Graph visualization of the vault — pages as nodes, wiki-links as edges.
@@ -48,7 +54,7 @@ const useGraphColors = () => {
     const observer = new MutationObserver(() => setColors(readColors()));
     observer.observe(document.documentElement, {
       attributes: true,
-      attributeFilter: ['class'],
+      attributeFilter: ["class"],
     });
     return () => observer.disconnect();
   }, []);
@@ -58,10 +64,10 @@ const useGraphColors = () => {
 const readColors = () => {
   const styles = getComputedStyle(document.documentElement);
   return {
-    node: styles.getPropertyValue('--primary').trim() || '#3b82f6',
-    nodeActive: styles.getPropertyValue('--foreground').trim() || '#0f172a',
-    link: styles.getPropertyValue('--border').trim() || '#cbd5e1',
-    label: styles.getPropertyValue('--muted-foreground').trim() || '#64748b',
+    node: styles.getPropertyValue("--primary").trim() || "#3b82f6",
+    nodeActive: styles.getPropertyValue("--foreground").trim() || "#0f172a",
+    link: styles.getPropertyValue("--border").trim() || "#cbd5e1",
+    label: styles.getPropertyValue("--muted-foreground").trim() || "#64748b",
   };
 };
 
@@ -96,7 +102,7 @@ export const GraphView: React.FC = () => {
         setLoading(false);
       })
       .catch((err) => {
-        console.error('[GraphView] Failed to load graph:', err);
+        console.error("[GraphView] Failed to load graph:", err);
         setLoading(false);
       })
       .finally(() => {
@@ -109,23 +115,39 @@ export const GraphView: React.FC = () => {
   }, [fetchGraph]);
 
   // Track container size — ForceGraph2D needs explicit width/height.
+  // Percentage heights on a flex-stretched parent don't reliably resolve,
+  // so we use ResizeObserver as primary signal and window resize as fallback.
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
     const update = () => {
       const r = el.getBoundingClientRect();
-      setSize({ width: Math.max(100, r.width), height: Math.max(100, r.height) });
+      const next = {
+        width: Math.max(100, Math.floor(r.width)),
+        height: Math.max(100, Math.floor(r.height)),
+      };
+      setSize((prev) =>
+        prev.width === next.width && prev.height === next.height ? prev : next,
+      );
     };
     update();
     const ro = new ResizeObserver(update);
     ro.observe(el);
-    return () => ro.disconnect();
+    window.addEventListener("resize", update);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener("resize", update);
+    };
   }, []);
 
   // Refresh (silently) on vault changes — debounced to avoid storms.
   useEffect(() => {
     const unsub = api.vault.onChanged((evt) => {
-      if (evt.type === 'add' || evt.type === 'change' || evt.type === 'unlink') {
+      if (
+        evt.type === "add" ||
+        evt.type === "change" ||
+        evt.type === "unlink"
+      ) {
         if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
         refreshTimerRef.current = setTimeout(() => fetchGraph(false), 300);
       }
@@ -147,14 +169,21 @@ export const GraphView: React.FC = () => {
     return set;
   }, [data, hoveredId]);
 
-  const libData = useMemo(() => (data ? toLibData(data) : { nodes: [], links: [] }), [data]);
+  const libData = useMemo(
+    () => (data ? toLibData(data) : { nodes: [], links: [] }),
+    [data],
+  );
 
   // Frame all nodes inside the visible canvas once the force simulation has
   // settled. Calling zoomToFit earlier (on data arrival) fires before d3-force
   // has spread the nodes, leaving them clustered on one side of the canvas.
   const frameGraph = useCallback(() => {
     if (!data || data.nodes.length === 0) return;
-    (graphRef.current as { zoomToFit?: (ms?: number, pad?: number) => void } | null)?.zoomToFit?.(400, 60);
+    (
+      graphRef.current as {
+        zoomToFit?: (ms?: number, pad?: number) => void;
+      } | null
+    )?.zoomToFit?.(400, 60);
   }, [data]);
 
   const handleNodeClick = useCallback(
@@ -196,8 +225,8 @@ export const GraphView: React.FC = () => {
       if (globalScale >= 1.5 && !dimmed) {
         const label = node.title;
         ctx.font = `${10 / globalScale}px sans-serif`;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'top';
+        ctx.textAlign = "center";
+        ctx.textBaseline = "top";
         ctx.fillStyle = colors.label;
         ctx.fillText(label, node.x ?? 0, (node.y ?? 0) + r + 2 / globalScale);
       }
@@ -210,7 +239,8 @@ export const GraphView: React.FC = () => {
     (link: RfgLink) => {
       if (neighborIds === null) return colors.link;
       const isHighlighted =
-        neighborIds.has(link.source as number) && neighborIds.has(link.target as number);
+        neighborIds.has(link.source as number) &&
+        neighborIds.has(link.target as number);
       return isHighlighted ? colors.node : colors.link;
     },
     [colors, neighborIds],
@@ -229,17 +259,23 @@ export const GraphView: React.FC = () => {
     return (
       <div className="flex flex-col h-full items-center justify-center bg-background px-6">
         <LinkIcon className="w-10 h-10 text-muted-foreground/40 mb-3" />
-        <p className="text-sm text-muted-foreground mb-1">Nenhuma página indexada ainda.</p>
+        <p className="text-sm text-muted-foreground mb-1">
+          Nenhuma página indexada ainda.
+        </p>
         <p className="text-xs text-muted-foreground/60 text-center max-w-sm">
-          Selecione um vault e crie algumas páginas com links <code className="font-mono">[[wikilink]]</code> para
-          vê-las como um grafo.
+          Selecione um vault e crie algumas páginas com links{" "}
+          <code className="font-mono">[[wikilink]]</code> para vê-las como um
+          grafo.
         </p>
       </div>
     );
   }
 
   return (
-    <div ref={containerRef} className="relative h-full w-full bg-background">
+    <div
+      ref={containerRef}
+      className="relative flex-1 min-h-0 min-w-0 bg-background"
+    >
       <ForceGraph2D
         ref={graphRef as never}
         graphData={libData}
@@ -248,9 +284,13 @@ export const GraphView: React.FC = () => {
         linkTarget="target"
         nodeRelSize={1}
         nodeCanvasObject={paintNode as never}
-        nodeCanvasObjectMode={() => 'replace'}
+        nodeCanvasObjectMode={() => "replace"}
         nodeLabel={(node) => (node as RfgNode).title}
-        nodePointerAreaPaint={(node: RfgNode, color: string, ctx: CanvasRenderingContext2D) => {
+        nodePointerAreaPaint={(
+          node: RfgNode,
+          color: string,
+          ctx: CanvasRenderingContext2D,
+        ) => {
           const r = nodeRadius(node.degree) + 4;
           ctx.fillStyle = color;
           ctx.beginPath();
@@ -266,8 +306,8 @@ export const GraphView: React.FC = () => {
         onEngineStop={frameGraph}
         cooldownTicks={120}
         backgroundColor="#00000000"
-        width={size.width}
-        height={size.height}
+        width={size.width} //
+        height={size.height} // size.height
       />
       {/* Overlay legend — bottom-left */}
       <div className="absolute bottom-3 left-3 px-3 py-2 rounded-lg bg-card/80 backdrop-blur border border-border text-[10px] text-muted-foreground space-y-1 pointer-events-none">
@@ -281,12 +321,17 @@ export const GraphView: React.FC = () => {
         <div className="flex items-center gap-2">
           <span
             className="inline-block w-2.5 h-2.5 rounded-full border-2"
-            style={{ borderColor: colors.nodeActive, backgroundColor: 'transparent' }}
+            style={{
+              borderColor: colors.nodeActive,
+              backgroundColor: "transparent",
+            }}
           />
           <span>Página atual</span>
         </div>
         <div className="pt-0.5">
-          <span className="opacity-70">Clique para abrir · Scroll para zoom</span>
+          <span className="opacity-70">
+            Clique para abrir · Scroll para zoom
+          </span>
         </div>
       </div>
     </div>
