@@ -675,6 +675,10 @@ export const AppShell: React.FC = () => {
         onHome={() => {
           setViewingHome(true);
           setViewingGraph(false);
+          // Close the currently open page so it isn't "in memory" while on Home:
+          // unhighlights the sidebar row, unbinds the chat session via
+          // reactToNavigation(null), and clears any dirty editor buffer.
+          useVaultStore.setState({ currentPath: null, currentContent: '', dirty: false });
           // Clear conversation view without tearing down IPC listeners
           // (reset() would unsubscribe ai:token and break the next stream).
           useChatStore.setState({

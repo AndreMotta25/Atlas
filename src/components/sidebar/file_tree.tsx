@@ -5,7 +5,7 @@ import { useChatStore } from '../../stores/chat_store';
 import { ContextMenu } from '../editor/context_menu';
 import type { MenuEntry } from '../editor/context_menu';
 import type { VaultTree } from '../../types';
-import { createNewPage, createNewFolder } from '../../lib/vault_utils';
+import { createNewPage, createNewFolder, createNewPageInFolder, createNewFolderInFolder } from '../../lib/vault_utils';
 import { useConfirm } from '../confirm_dialog';
 import { FileIcon, FolderIcon, FolderOpen, FolderPlus, SendIcon } from '../icons';
 
@@ -18,18 +18,21 @@ interface TreeNodeProps {
   onDragEnd: () => void;
   onDrop: (srcPath: string, destPath: string) => Promise<void>;
   setDropTarget: (path: string | null) => void;
-  onContextMenu: (e: React.MouseEvent, path: string) => void;
+  onContextMenu: (e: React.MouseEvent, path: string, isDir: boolean) => void;
   renamingPath: string | null;
   renameValue: string;
   onRenameChange: (value: string) => void;
   onRenameSubmit: () => void;
   onRenameCancel: () => void;
+  expandedFolders: Record<string, boolean>;
+  onToggleExpanded: (path: string) => void;
 }
 
 interface ContextMenuState {
   x: number;
   y: number;
   path: string;
+  isDir: boolean;
 }
 
 const RenameInput: React.FC<{
@@ -77,15 +80,16 @@ const TreeNode: React.FC<TreeNodeProps> = ({
   onRenameChange,
   onRenameSubmit,
   onRenameCancel,
+  expandedFolders,
+  onToggleExpanded,
 }) => {
   const currentPath = useVaultStore((s) => s.currentPath);
   const openPage = useVaultStore((s) => s.openPage);
-  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const isRenaming = renamingPath === node.path;
 
   if (node.isDir) {
     const isRoot = depth === 0;
-    const isOpen = isRoot ? true : expanded[node.path] !== false;
+    const isOpen = isRoot ? true : expandedFolders[node.path] !== false;
     const isDropTarget = dropTarget === node.path;
 
     return (
@@ -117,7 +121,7 @@ const TreeNode: React.FC<TreeNodeProps> = ({
             onContextMenu={(e) => {
               e.preventDefault();
               e.stopPropagation();
-              onContextMenu(e, node.path);
+              onContextMenu(e, node.path, node.isDir);
             }}
             className={`rounded transition-colors ${
               isDropTarget ? 'bg-accent ring-2 ring-primary' : ''
@@ -129,7 +133,7 @@ const TreeNode: React.FC<TreeNodeProps> = ({
               </div>
             ) : (
               <button
-                onClick={() => setExpanded((e) => ({ ...e, [node.path]: !isOpen }))}
+                onClick={() => onToggleExpanded(node.path)}
                 className="w-full text-left px-2 py-1 hover:bg-accent rounded text-sm flex items-center gap-1"
                 style={{ paddingLeft: depth * 12 + 8 }}
               >
@@ -164,6 +168,8 @@ const TreeNode: React.FC<TreeNodeProps> = ({
                 onRenameChange={onRenameChange}
                 onRenameSubmit={onRenameSubmit}
                 onRenameCancel={onRenameCancel}
+                expandedFolders={expandedFolders}
+                onToggleExpanded={onToggleExpanded}
               />
             ))}
           </div>
@@ -194,7 +200,7 @@ const TreeNode: React.FC<TreeNodeProps> = ({
           onClick={() => void openPage(node.path)}
           onContextMenu={(e) => {
             e.preventDefault();
-            onContextMenu(e, node.path);
+            onContextMenu(e, node.path, node.isDir);
           }}
           className={`w-full text-left px-2 py-1 rounded text-sm truncate transition-opacity ${
             isActive ? 'bg-accent text-accent-foreground' : 'hover:bg-accent text-foreground'
@@ -222,9 +228,23 @@ export const FileTree: React.FC = () => {
   const [ctxMenu, setCtxMenu] = useState<ContextMenuState | null>(null);
   const [renamingPath, setRenamingPath] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState('');
+  const [expandedFolders, setExpandedFolders] = useState<Record<string, boolean>>({});
 
-  const handleContextMenu = (e: React.MouseEvent, path: string) => {
-    setCtxMenu({ x: e.clientX, y: e.clientY, path });
+  const toggleExpanded = (path: string) => {
+    setExpandedFolders((prev) => ({ ...prev, [path]: prev[path] === false }));
+  };
+
+  const ensureExpanded = (path: string) => {
+    setExpandedFolders((prev) => {
+      if (prev[path] === undefined) return prev;
+      const next = { ...prev };
+      delete next[path];
+      return next;
+    });
+  };
+
+  const handleContextMenu = (e: React.MouseEvent, path: string, isDir: boolean) => {
+    setCtxMenu({ x: e.clientX, y: e.clientY, path, isDir });
   };
 
   const startRename = () => {
@@ -271,6 +291,30 @@ export const FileTree: React.FC = () => {
 
   const handleNewFolder: () => void = () => void createNewFolder();
 
+  const handleNewPageInFolder = async () => {
+    if (!ctxMenu) return;
+    const folderPath = ctxMenu.path;
+    setCtxMenu(null);
+    ensureExpanded(folderPath);
+    try {
+      await createNewPageInFolder(folderPath);
+    } catch (err) {
+      console.error('Falha ao criar página na pasta:', err);
+    }
+  };
+
+  const handleNewSubfolder = async () => {
+    if (!ctxMenu) return;
+    const parentPath = ctxMenu.path;
+    setCtxMenu(null);
+    ensureExpanded(parentPath);
+    try {
+      await createNewFolderInFolder(parentPath);
+    } catch (err) {
+      console.error('Falha ao criar subpasta:', err);
+    }
+  };
+
   const handleMove = async (srcPath: string, destPath: string) => {
     await api.vault.movePage(srcPath, destPath);
     await loadTree();
@@ -313,6 +357,23 @@ export const FileTree: React.FC = () => {
 
   const contextMenuItems: MenuEntry[] = ctxMenu
     ? [
+        ...(ctxMenu.isDir
+          ? [
+              {
+                type: 'item' as const,
+                label: 'Nova página',
+                icon: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>`,
+                onSelect: handleNewPageInFolder,
+              },
+              {
+                type: 'item' as const,
+                label: 'Nova subpasta',
+                icon: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/><line x1="12" y1="11" x2="12" y2="17"/><line x1="9" y1="14" x2="15" y2="14"/></svg>`,
+                onSelect: handleNewSubfolder,
+              },
+              { type: 'separator' as const },
+            ]
+          : []),
         ...(ctxMenu.path.endsWith('.md')
           ? [
               {
@@ -386,6 +447,8 @@ export const FileTree: React.FC = () => {
               onRenameChange={setRenameValue}
               onRenameSubmit={submitRename}
               onRenameCancel={cancelRename}
+              expandedFolders={expandedFolders}
+              onToggleExpanded={toggleExpanded}
             />
           )
         )}
