@@ -268,7 +268,7 @@ export const EditorPane: React.FC<EditorPaneProps> = ({ onCommentsChange, onComm
           }
         }
 
-        if (from >= 0 && to > from) {
+        if (from >= 0 && to > from && pos >= from && pos <= to) {
           const inner = doc.slice(from + 2, to - 2); // strip [[ and ]]
           console.log('[WikiLink] inner:', JSON.stringify(inner));
           // Handle aliases: [[display|page]] → page, [[page#heading]] → page
