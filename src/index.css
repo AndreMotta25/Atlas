@@ -227,7 +227,7 @@ input {
 }
 
 .cm-editor .cm-trailingWhitespace {
-  background-color: color-mix(in srgb, var(--color-destructive) 25%, transparent);
+  background-color: color-mix(in srgb, var(--color-muted-foreground) 30%, transparent);
   border-radius: 2px;
 }
 
