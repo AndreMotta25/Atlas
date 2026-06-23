@@ -228,12 +228,19 @@ class AIOrchestratorClass {
 
     const systemPrompt = settings.systemPrompt?.trim() || DEFAULT_SYSTEM_PROMPT;
 
+    // When the session is bound to a specific page, inject a block so the AI
+    // treats it as the primary focus across the whole conversation.
+    const boundPage = typeof opts.pagePath === 'string' && opts.pagePath.trim() ? opts.pagePath.trim() : null;
+    const fullSystemPrompt = boundPage
+      ? `${systemPrompt}\n\n══ PÁGINA VINCULADA ══\nEsta conversa está vinculada à página \`${boundPage}\` do vault. Trate-a como o FOCO PRIMÁRIO — o usuário está editando ela agora. Pedidos vagos como "esta página", "o documento", "a nota" sem nome explícito referem-se a ela. Use \`read_page({ path: "${boundPage}" })\` para ler e \`edit_page({ path: "${boundPage}", ... })\` para alterar.`
+      : systemPrompt;
+
     const result: StreamResult = { assistantText: '', pendingToolCalls: [] };
 
     try {
       const stream = streamText({
         model,
-        system: systemPrompt,
+        system: fullSystemPrompt,
         messages: this.toModelMessages(opts.messages),
         tools: TOOLS,
         abortSignal,

@@ -74,6 +74,13 @@ interface ChatState {
   deleteConversation: (id: string) => Promise<void>;
   /** Update the pagePath of a session (null to unbind). Updates local state if it's the active session. */
   setSessionPagePath: (id: string, pagePath: string | null) => Promise<void>;
+  /**
+   * React to the editor's currentPath changing. Rebinds the active session to
+   * the new page (or unbinds when newPath is null) and rewires contextPages so
+   * the AI's per-turn context always reflects the page the user is on, while
+   * preserving any manually-added pages. No-op if there's no active session.
+   */
+  reactToNavigation: (newPath: string | null) => Promise<void>;
 }
 
 export const useChatStore = create<ChatState>((set, get) => ({
@@ -213,9 +220,12 @@ export const useChatStore = create<ChatState>((set, get) => ({
         session = await api.chat.createSession({ pagePath, title: null });
         // When page-bound, also auto-load the page into chat context so the
         // AI sees it without requiring the user to click "Enviar para o Atlas".
+        // Preserve any manual context additions the user already made.
         set({
           activeSession: session,
-          contextPages: pagePath ? [pagePath] : get().contextPages,
+          contextPages: pagePath
+            ? [pagePath, ...get().contextPages.filter((p) => p !== pagePath)]
+            : get().contextPages,
         });
       }
       const seq = get().messages.length;
@@ -252,7 +262,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
       }));
 
     try {
-      const { requestId } = await api.ai.chat({ messages: history });
+      const { requestId } = await api.ai.chat({
+        messages: history,
+        pagePath: get().activeSession?.pagePath ?? null,
+      });
       set((s) => ({
         messages: s.messages.map((m) =>
           m.id === assistantId ? { ...m, id: requestId } : m,
@@ -374,7 +387,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     }));
 
     try {
-      const result = await api.ai.compact(state.messages);
+      const result = await api.ai.compact(state.messages, state.activeSession?.pagePath ?? null);
       if (result.success && result.summary) {
         // Mark the previous session as "(compactada)" so the original
         // conversation stays accessible in history, and start a fresh
@@ -414,7 +427,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
           activeRequestId: null,
           error: null,
           activeSession: newSession,
-          contextPages: compactedPagePath ? [compactedPagePath] : get().contextPages,
+          // Preserve manual context additions across the compact; the
+          // compacted session inherits the same binding as before.
+          contextPages: compactedPagePath
+            ? [compactedPagePath, ...get().contextPages.filter((p) => p !== compactedPagePath)]
+            : get().contextPages,
         });
         void get().refreshSessions();
       } else {
@@ -451,7 +468,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
       messages: [],
       error: null,
       activeRequestId: null,
-      contextPages: pagePath ? [pagePath] : [],
+      contextPages: pagePath
+        ? [pagePath, ...get().contextPages.filter((p) => p !== pagePath)]
+        : [],
     });
     void get().refreshSessions();
   },
@@ -466,6 +485,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
         messages: loaded.messages,
         error: null,
         activeRequestId: null,
+        // Sync contextPages with the loaded session's binding. The previous
+        // session's manual context additions are intentionally dropped — they
+        // belonged to a different conversation and may no longer apply.
+        contextPages: loaded.session.pagePath ? [loaded.session.pagePath] : [],
       });
     } catch (err) {
       set({ error: err instanceof Error ? err.message : String(err) });
@@ -496,6 +519,38 @@ export const useChatStore = create<ChatState>((set, get) => ({
       void get().refreshSessions();
     } catch (err) {
       set({ error: err instanceof Error ? err.message : String(err) });
+    }
+  },
+
+  reactToNavigation: async (newPath) => {
+    const { activeSession, contextPages } = get();
+    if (!activeSession) return;
+    if (activeSession.pagePath === newPath) return; // no change
+
+    // Capture the previous bound path before setSessionPagePath mutates the store.
+    const oldBoundPath = activeSession.pagePath;
+
+    // Persist the new pagePath to the DB. Skip the IPC round-trip if both
+    // values are null (a no-op write to a session that was never bound).
+    if (oldBoundPath !== null || newPath !== null) {
+      await get().setSessionPagePath(activeSession.id, newPath);
+    }
+
+    // Rewire contextPages so the AI's per-turn context follows the editor:
+    //  · newPath is a page → put it at index 0, drop any stale reference to
+    //    the previously-bound page, keep every manual addition intact.
+    //  · newPath is null (Home) → clear contextPages; the user is not looking
+    //    at any specific page, so the per-turn context is empty. The session
+    //    itself is also unbound (pagePath === null from setSessionPagePath).
+    if (newPath === null) {
+      if (contextPages.length > 0) {
+        set({ contextPages: [] });
+      }
+    } else {
+      const filtered = oldBoundPath
+        ? contextPages.filter((p) => p !== oldBoundPath)
+        : contextPages;
+      set({ contextPages: [newPath, ...filtered] });
     }
   },
 }));

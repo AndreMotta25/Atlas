@@ -154,8 +154,8 @@ const electronAPI = {
       ipcRenderer.invoke(createChannel('ai', 'chat'), opts),
     cancel: (requestId: string): Promise<{ success: boolean }> =>
       ipcRenderer.invoke(createChannel('ai', 'cancel'), requestId),
-    compact: (messages: ChatMessage[]): Promise<{ success: boolean; summary?: string; error?: string }> =>
-      ipcRenderer.invoke(createChannel('ai', 'compact'), messages),
+    compact: (messages: ChatMessage[], pagePath?: string | null): Promise<{ success: boolean; summary?: string; error?: string }> =>
+      ipcRenderer.invoke(createChannel('ai', 'compact'), messages, pagePath ?? null),
     search: (query: string, pagePaths: string[]): Promise<{ success: boolean; results?: Array<{ path: string; reason: string }>; error?: string }> =>
       ipcRenderer.invoke(createChannel('ai', 'search'), query, pagePaths),
     onToken: (listener: Listener<ChatStreamChunk>): Unsubscribe => {

@@ -98,6 +98,9 @@ export interface ChatMessage {
 export interface ChatRequestOptions {
   messages: ChatMessage[];
   model?: string;
+  /** When set, the AI is told this conversation is bound to a specific page
+   *  and should treat it as the primary focus. Injected into the system prompt. */
+  pagePath?: string | null;
 }
 
 export interface ChatStreamChunk {
@@ -173,6 +176,9 @@ export interface ConversationContext {
   requestId: string;
   messages: ChatMessage[];
   model?: string;
+  /** Page this conversation is bound to — kept so resumed turns (after tool confirmation)
+   *  also include the "PÁGINA VINCULADA" block in the system prompt. */
+  pagePath?: string | null;
   /** Pending write tool calls awaiting confirmation, keyed by toolCallId. */
   pending: Map<string, PendingToolCall>;
 }

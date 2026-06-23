@@ -57,13 +57,14 @@ const runTurnAndStore = async (
     requestId,
     messages: opts.messages,
     model: opts.model,
+    pagePath: opts.pagePath ?? null,
     pending: new Map(),
   };
   conversationContexts.set(requestId, context);
 
   try {
     const result = await AIOrchestrator.runTurn(
-      { messages: opts.messages, model: opts.model },
+      { messages: opts.messages, model: opts.model, pagePath: opts.pagePath ?? null },
       requestId,
       buildSinks(sender),
       controller.signal,
@@ -148,7 +149,7 @@ export const resumeConversation = async (
 
   try {
     const result = await AIOrchestrator.runTurn(
-      { messages: updatedMessages, model: context.model },
+      { messages: updatedMessages, model: context.model, pagePath: context.pagePath ?? null },
       requestId,
       buildSinks(sender),
       controller.signal,
@@ -224,7 +225,7 @@ export const registerAIHandlers = (): void => {
   // ── AI: Compact conversation ──
   ipcMain.handle(
     createChannel('ai', 'compact'),
-    async (_e, messages: ChatMessage[]) => {
+    async (_e, messages: ChatMessage[], pagePath?: string | null) => {
       const settings = ConfigStore.load();
       const apiKey = SecureStore.getApiKey(settings.activeProvider);
       if (!apiKey) return { success: false, error: 'Nenhuma API key configurada.' };
@@ -262,6 +263,11 @@ export const registerAIHandlers = (): void => {
         })
         .join('\n\n---\n\n');
 
+      const boundPage = typeof pagePath === 'string' && pagePath.trim() ? pagePath.trim() : null;
+      const boundBlock = boundPage
+        ? `\n\nEsta conversa estava vinculada à página \`${boundPage}\` — mencione isso explicitamente na seção "Contexto" se for relevante.`
+        : '';
+
       try {
         const result = await generateText({
           model,
@@ -285,7 +291,7 @@ Bullets com próximos passos explícitos ou implícitos. Se não houver, escreva
 Regras:
 - Português, direto, sem emojis.
 - Não invente paths nem conteúdos que não estejam na conversa.
-- Marque incerteza com "(?)".`,
+- Marque incerteza com "(?)".${boundBlock}`,
           messages: [
             {
               role: 'user',

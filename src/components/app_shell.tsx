@@ -86,6 +86,13 @@ export const AppShell: React.FC = () => {
     if (currentPath !== null) setViewingGraph(false);
   }, [currentPath]);
 
+  // Keep the active chat session in sync with the editor's currentPath.
+  // When the user navigates to a different page, rebind the session to it
+  // (or unbind if they go to Home) and rewire the AI's per-turn context.
+  useEffect(() => {
+    void useChatStore.getState().reactToNavigation(currentPath);
+  }, [currentPath]);
+
   // Overlay drag position (offset from top-left of the viewport).
   const [overlayPos, setOverlayPos] = useState<{ x: number; y: number } | null>(null);
   const dragRef = useRef<{ startX: number; startY: number; origX: number; origY: number } | null>(null);
