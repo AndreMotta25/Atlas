@@ -4,6 +4,7 @@ import { useVaultStore } from '../../stores/vault_store';
 import { Message } from '../chat/message';
 import { ThinkingIndicator } from '../thinking_indicator';
 import { SendButton } from '../send_button';
+import { ThemeToggle } from '../theme_toggle';
 import type { ChatSession, VaultTree } from '../../types';
 
 const SUGGESTIONS = [
@@ -148,6 +149,9 @@ export const HomeView: React.FC = () => {
   if (!hasMessages) {
     return (
       <div className="flex flex-col h-full bg-background overflow-hidden">
+        <div className="shrink-0 flex items-center justify-end gap-1.5 px-4 py-1.5 border-b border-border bg-muted/30">
+          <ThemeToggle variant="compact" />
+        </div>
         <div className="flex-1 overflow-auto flex flex-col items-center justify-center px-6 py-10">
           <div className="w-full max-w-2xl flex flex-col items-center animate-scale-in">
             <AtlasLogo className="w-14 h-14 text-primary mb-5" />
@@ -250,7 +254,9 @@ export const HomeView: React.FC = () => {
           )}
         </div>
 
-        <div className="flex items-center gap-0.5">
+        <div className="flex items-center gap-1.5">
+          <ThemeToggle variant="compact" />
+          <div className="w-px h-4 bg-border" />
           <button
             onClick={() => void newConversation()}
             className="p-1 hover:bg-accent rounded text-muted-foreground hover:text-foreground transition-colors"

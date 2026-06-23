@@ -2,10 +2,11 @@ import { useEffect, useState, useCallback } from 'react';
 import { api } from '../../lib/api';
 import { useSettingsStore } from '../../stores/settings_store';
 import { useVaultStore } from '../../stores/vault_store';
-import { useTheme } from '../../hooks/use_theme';
-import type { AIProvider, ThemeMode } from '../../types';
+import type { AIProvider } from '../../types';
 import { CloseIcon, SuccessIcon, WarningIcon } from '../icons';
 import { Toggle } from '../toggle';
+import { ThemeToggle } from '../theme_toggle';
+import { AutoBindToggle } from '../auto_bind_toggle';
 
 interface SettingsModalProps {
   onClose: () => void;
@@ -25,8 +26,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
   const deleteApiKey = useSettingsStore((s) => s.deleteApiKey);
   const loadSettings = useSettingsStore((s) => s.load);
   const loadTree = useVaultStore((s) => s.loadTree);
-
-  const { setTheme } = useTheme();
 
   const [keyDraft, setKeyDraft] = useState('');
   const [hasKey, setHasKey] = useState<boolean | null>(null);
@@ -192,16 +191,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
     }
   };
 
-  const handleAutoBindChange = async (next: boolean) => {
-    await update({ autoBindChatToPage: next });
-  };
-
-  const THEME_OPTIONS: { id: ThemeMode; label: string }[] = [
-    { id: 'light', label: 'Claro' },
-    { id: 'dark', label: 'Escuro' },
-    { id: 'system', label: 'Sistema' },
-  ];
-
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 animate-fade-in">
       <div className="bg-card rounded-lg shadow-xl dark:shadow-2xl w-full max-w-lg max-h-[80vh] overflow-auto animate-scale-in">
@@ -244,33 +233,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
           {/* Tema */}
           <section>
             <h3 className="text-sm font-semibold text-foreground mb-2">Tema</h3>
-            <div className="grid grid-cols-3 gap-2">
-              {THEME_OPTIONS.map((opt) => (
-                <button
-                  key={opt.id}
-                  onClick={() => void setTheme(opt.id)}
-                  className={`px-3 py-2 rounded-lg text-sm font-medium border transition-colors ${
-                    settings.themeMode === opt.id
-                      ? 'border-primary bg-accent text-accent-foreground'
-                      : 'border-border hover:bg-accent text-foreground'
-                  }`}
-                >
-                  {opt.label}
-                </button>
-              ))}
-            </div>
+            <ThemeToggle variant="full" />
           </section>
 
           {/* Atlas */}
           <section>
             <h3 className="text-sm font-semibold text-foreground mb-2">Atlas</h3>
             <div className="p-3 bg-muted/40 border border-border rounded-lg">
-              <Toggle
-                checked={settings.autoBindChatToPage}
-                onChange={handleAutoBindChange}
-                label="Vincular nova conversa à página atual"
-                description="Quando ativo, cada nova conversa no Atlas é automaticamente vinculada à página aberta no editor. Se nenhuma página estiver aberta, a conversa será global (como antes)."
-              />
+              <AutoBindToggle />
             </div>
           </section>
 

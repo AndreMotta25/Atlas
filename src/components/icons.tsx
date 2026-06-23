@@ -172,6 +172,14 @@ export const LinkIcon: React.FC<IconProps> = ({ className = 'w-4 h-4' }) => (
   </svg>
 );
 
+export const UnlinkIcon: React.FC<IconProps> = ({ className = 'w-4 h-4' }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <path d="M18.84 12.61a4 4 0 0 0-5.66-5.66l-1.41 1.41" />
+    <path d="M5.16 11.39a4 4 0 0 0 5.66 5.66l1.41-1.41" />
+    <line x1="3" y1="3" x2="21" y2="21" />
+  </svg>
+);
+
 export const ArrowUpRight: React.FC<IconProps> = ({ className = 'w-4 h-4' }) => (
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className={className}>
     <path d="M7 17L17 7" />

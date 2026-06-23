@@ -8,6 +8,7 @@ import {
 } from '../icons';
 import { ThinkingIndicator } from '../thinking_indicator';
 import { SendButton } from '../send_button';
+import { AutoBindToggle } from '../auto_bind_toggle';
 import { HIGHLIGHT_COLORS } from '../../types';
 
 /** Format a timestamp as a relative time string (pt-BR). */
@@ -313,6 +314,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
               )}
             </div>
             <div className="flex items-center gap-0.5">
+              <AutoBindToggle variant="compact" />
               <button
                 onClick={() => void newConversation()}
                 className="p-1.5 hover:bg-accent rounded text-muted-foreground hover:text-foreground transition-colors"
