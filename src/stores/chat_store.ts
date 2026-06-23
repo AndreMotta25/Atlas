@@ -1,5 +1,7 @@
 import { create } from 'zustand';
 import { api } from '../lib/api';
+import { useSettingsStore } from './settings_store';
+import { useVaultStore } from './vault_store';
 import type {
   ChatMessage,
   ChatSession,
@@ -14,6 +16,17 @@ const newId = () => Math.random().toString(36).slice(2, 10);
 const noop = (): void => { /* intentional */ };
 
 const WRITE_TOOLS = new Set(['create_page', 'edit_page']);
+
+/**
+ * Resolves the pagePath a new chat session should be created with.
+ * Returns null when the auto-bind setting is off or no page is currently
+ * open in the editor (e.g. user is on the Home view).
+ */
+const resolveBindPagePath = (): string | null => {
+  const { autoBindChatToPage } = useSettingsStore.getState().settings;
+  const { currentPath } = useVaultStore.getState();
+  return autoBindChatToPage && currentPath ? currentPath : null;
+};
 
 interface ChatState {
   messages: ChatMessage[];
@@ -59,6 +72,8 @@ interface ChatState {
   loadConversation: (id: string) => Promise<void>;
   /** Delete a session from disk. If it's the active one, clears state. */
   deleteConversation: (id: string) => Promise<void>;
+  /** Update the pagePath of a session (null to unbind). Updates local state if it's the active session. */
+  setSessionPagePath: (id: string, pagePath: string | null) => Promise<void>;
 }
 
 export const useChatStore = create<ChatState>((set, get) => ({
@@ -194,8 +209,14 @@ export const useChatStore = create<ChatState>((set, get) => ({
     let session = get().activeSession;
     try {
       if (!session) {
-        session = await api.chat.createSession({ pagePath: null, title: null });
-        set({ activeSession: session });
+        const pagePath = resolveBindPagePath();
+        session = await api.chat.createSession({ pagePath, title: null });
+        // When page-bound, also auto-load the page into chat context so the
+        // AI sees it without requiring the user to click "Enviar para o Atlas".
+        set({
+          activeSession: session,
+          contextPages: pagePath ? [pagePath] : get().contextPages,
+        });
       }
       const seq = get().messages.length;
       await api.chat.saveMessage(session.id, userMsg, seq);
@@ -370,8 +391,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
           }
         }
 
+        const compactedPagePath = resolveBindPagePath();
         const newSession = await api.chat.createSession({
-          pagePath: null,
+          pagePath: compactedPagePath,
           title: 'Conversa compactada',
         });
         const summaryContent = `*Conversa compactada — versão resumida do histórico anterior. Continue normalmente.*\n\n${result.summary}`;
@@ -392,6 +414,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
           activeRequestId: null,
           error: null,
           activeSession: newSession,
+          contextPages: compactedPagePath ? [compactedPagePath] : get().contextPages,
         });
         void get().refreshSessions();
       } else {
@@ -421,12 +444,14 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
   newConversation: async () => {
     if (get().streaming) return;
-    const session = await api.chat.createSession({ pagePath: null, title: null });
+    const pagePath = resolveBindPagePath();
+    const session = await api.chat.createSession({ pagePath, title: null });
     set({
       activeSession: session,
       messages: [],
       error: null,
       activeRequestId: null,
+      contextPages: pagePath ? [pagePath] : [],
     });
     void get().refreshSessions();
   },
@@ -453,6 +478,20 @@ export const useChatStore = create<ChatState>((set, get) => ({
       const { activeSession } = get();
       if (activeSession?.id === id) {
         set({ activeSession: null, messages: [] });
+      }
+      void get().refreshSessions();
+    } catch (err) {
+      set({ error: err instanceof Error ? err.message : String(err) });
+    }
+  },
+
+  setSessionPagePath: async (id, pagePath) => {
+    try {
+      const res = await api.chat.updateSessionPagePath(id, pagePath);
+      if (!res.success || !res.session) return;
+      const { activeSession } = get();
+      if (activeSession?.id === id) {
+        set({ activeSession: res.session });
       }
       void get().refreshSessions();
     } catch (err) {

@@ -360,6 +360,14 @@ class DatabaseServiceClass {
     ).run(title.slice(0, 120), Date.now(), sessionId);
   }
 
+  /** Update a session's pagePath binding (or unbind by passing null). */
+  updateSessionPagePath(sessionId: string, pagePath: string | null): void {
+    const db = this.requireOpen();
+    db.prepare(
+      'UPDATE chat_sessions SET page_path = ?, updated_at = ? WHERE id = ?',
+    ).run(pagePath, Date.now(), sessionId);
+  }
+
   /** Bump updated_at — call when a message is appended/updated. */
   touchSession(sessionId: string): void {
     const db = this.requireOpen();

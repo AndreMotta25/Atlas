@@ -18,7 +18,7 @@ import { createNewPage, createNewFolder } from '../lib/vault_utils';
 import {
   SearchIcon, SpinnerIcon, CloseIcon, FileIcon, FolderPlus, PlusIcon,
   GearIcon, SearchEmptyIcon, ClockIcon, SuccessIcon, AtlasActivityIcon, ChatIcon,
-  ChevronLeft, ChevronRight,
+  LinkIcon, ChevronLeft, ChevronRight,
 } from './icons';
 
 import type { ChatSession } from '../types';
@@ -48,6 +48,7 @@ export const AppShell: React.FC = () => {
   const newConversation = useChatStore((s) => s.newConversation);
   const loadConversation = useChatStore((s) => s.loadConversation);
   const deleteConversation = useChatStore((s) => s.deleteConversation);
+  const setSessionPagePath = useChatStore((s) => s.setSessionPagePath);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [sidebarWidth, setSidebarWidth] = useState(260);
   const [chatWidth, setChatWidth] = useState(380);
@@ -559,6 +560,36 @@ export const AppShell: React.FC = () => {
                     <ChatIcon className="w-3.5 h-3.5 text-primary shrink-0" />
                     <span className="truncate">{activeSession.title ?? 'Sem título'}</span>
                   </button>
+                  {activeSession.pagePath && (() => {
+                    const boundPath = activeSession.pagePath;
+                    return (
+                    <div className="mt-1.5 flex items-center gap-1 px-2 py-1 rounded bg-primary/10 border border-primary/20 text-[11px]">
+                      <LinkIcon className="w-3 h-3 text-primary shrink-0" />
+                      <span
+                        className="flex-1 truncate text-foreground/80"
+                        title={`Vinculada a ${boundPath}`}
+                      >
+                        {boundPath}
+                      </span>
+                      <button
+                        onClick={() => void openPage(boundPath)}
+                        className="shrink-0 p-0.5 rounded text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+                        title="Abrir página no editor"
+                        aria-label="Abrir página vinculada no editor"
+                      >
+                        <FileIcon className="w-3 h-3" />
+                      </button>
+                      <button
+                        onClick={() => void setSessionPagePath(activeSession.id, null)}
+                        className="shrink-0 p-0.5 rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                        title="Desvincular desta página"
+                        aria-label="Desvincular conversa desta página"
+                      >
+                        <CloseIcon className="w-3 h-3" />
+                      </button>
+                    </div>
+                    );
+                  })()}
                 </div>
               )}
 
@@ -584,9 +615,15 @@ export const AppShell: React.FC = () => {
                             setViewingHome(true);
                           }}
                           className="flex-1 flex items-center gap-2 text-left text-xs px-2 py-1.5 rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-colors min-w-0"
-                          title={s.title ?? 'Sem título'}
+                          title={s.pagePath ? `${s.title ?? 'Sem título'} — vinculada a ${s.pagePath}` : (s.title ?? 'Sem título')}
                         >
                           <ChatIcon className="w-3 h-3 shrink-0" />
+                          {s.pagePath && (
+                            <LinkIcon
+                              className="w-2.5 h-2.5 shrink-0 text-primary"
+                              aria-label={`Vinculada a ${s.pagePath}`}
+                            />
+                          )}
                           <span className="truncate">{s.title ?? 'Sem título'}</span>
                         </button>
                         <button

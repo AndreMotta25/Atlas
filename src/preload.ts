@@ -118,6 +118,11 @@ const electronAPI = {
       ipcRenderer.invoke(createChannel('chat', 'delete-session'), id),
     renameSession: (id: string, title: string): Promise<{ success: boolean }> =>
       ipcRenderer.invoke(createChannel('chat', 'rename-session'), id, title),
+    updateSessionPagePath: (
+      id: string,
+      pagePath: string | null,
+    ): Promise<{ success: boolean; session?: ChatSession; error?: string }> =>
+      ipcRenderer.invoke(createChannel('chat', 'update-session-page-path'), id, pagePath),
     saveMessage: (sessionId: string, message: ChatMessage, seq: number): Promise<{ success: boolean }> =>
       ipcRenderer.invoke(createChannel('chat', 'save-message'), sessionId, message, seq),
     searchMessages: (query: string, limit?: number): Promise<ChatSearchResult[]> =>

@@ -89,6 +89,28 @@ export const registerChatHandlers = (): void => {
     },
   );
 
+  // Bind/unbind a session to a page. Pass null as pagePath to unbind.
+  ipcMain.handle(
+    createChannel('chat', 'update-session-page-path'),
+    async (
+      _e,
+      id: string,
+      pagePath: string | null,
+    ): Promise<{ success: boolean; session?: ChatSession; error?: string }> => {
+      if (typeof id !== 'string') return { success: false, error: 'invalid id' };
+      if (pagePath !== null && typeof pagePath !== 'string') {
+        return { success: false, error: 'invalid pagePath' };
+      }
+      try {
+        DatabaseService.updateSessionPagePath(id, pagePath);
+        const session = DatabaseService.getSession(id);
+        return { success: true, session: session ?? undefined };
+      } catch (err) {
+        return { success: false, error: err instanceof Error ? err.message : String(err) };
+      }
+    },
+  );
+
   // Upsert a message into a session (idempotent by message.id).
   // `seq` is the message's position within the session — the renderer passes
   // its current messages.length as seq when persisting.

@@ -208,6 +208,8 @@ export interface AppSettings {
   systemPrompt?: string;
   /** Google Font family name applied to the editor + chat. null = system default. */
   fontFamily: string | null;
+  /** When true, new chat sessions are automatically bound to the page open in the editor. */
+  autoBindChatToPage: boolean;
 }
 
 // ─── Search / Index Types ───────────────────────────────────────

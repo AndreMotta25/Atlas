@@ -5,6 +5,7 @@ import { useVaultStore } from '../../stores/vault_store';
 import { useTheme } from '../../hooks/use_theme';
 import type { AIProvider, ThemeMode } from '../../types';
 import { CloseIcon, SuccessIcon, WarningIcon } from '../icons';
+import { Toggle } from '../toggle';
 
 interface SettingsModalProps {
   onClose: () => void;
@@ -191,6 +192,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
     }
   };
 
+  const handleAutoBindChange = async (next: boolean) => {
+    await update({ autoBindChatToPage: next });
+  };
+
   const THEME_OPTIONS: { id: ThemeMode; label: string }[] = [
     { id: 'light', label: 'Claro' },
     { id: 'dark', label: 'Escuro' },
@@ -253,6 +258,19 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                   {opt.label}
                 </button>
               ))}
+            </div>
+          </section>
+
+          {/* Atlas */}
+          <section>
+            <h3 className="text-sm font-semibold text-foreground mb-2">Atlas</h3>
+            <div className="p-3 bg-muted/40 border border-border rounded-lg">
+              <Toggle
+                checked={settings.autoBindChatToPage}
+                onChange={handleAutoBindChange}
+                label="Vincular nova conversa à página atual"
+                description="Quando ativo, cada nova conversa no Atlas é automaticamente vinculada à página aberta no editor. Se nenhuma página estiver aberta, a conversa será global (como antes)."
+              />
             </div>
           </section>
 
