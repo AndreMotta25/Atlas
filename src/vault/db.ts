@@ -23,8 +23,14 @@ class DatabaseServiceClass {
   open(): void {
     if (this.db) return;
     const dbPath = path.join(app.getPath('userData'), 'atlas.db');
+    console.log('[db] opening:', dbPath);
     this.db = new Database(dbPath);
-    this.db.pragma('journal_mode = WAL');
+    try {
+      this.db.pragma('journal_mode = WAL');
+    } catch (err) {
+      console.warn('[db] WAL unavailable, falling back to TRUNCATE:', err);
+      this.db.pragma('journal_mode = TRUNCATE');
+    }
     this.db.pragma('foreign_keys = ON');
     this.migrate();
   }

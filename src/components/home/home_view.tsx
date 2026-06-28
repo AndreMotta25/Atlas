@@ -5,6 +5,7 @@ import { Message } from '../chat/message';
 import { ThinkingIndicator } from '../thinking_indicator';
 import { SendButton } from '../send_button';
 import { ThemeToggle } from '../theme_toggle';
+import { AppIcon } from './app_icon';
 import type { ChatSession, VaultTree } from '../../types';
 
 const SUGGESTIONS = [
@@ -32,18 +33,6 @@ function titleFromPath(path: string): string {
   const base = path.split('/').pop() || path;
   return base.replace(/\.md$/i, '').replace(/[-_]/g, ' ');
 }
-
-const AtlasLogo: React.FC<{ className?: string }> = ({ className }) => (
-  <svg viewBox="0 0 48 48" fill="none" className={className} aria-hidden>
-    <circle cx="24" cy="24" r="22" stroke="currentColor" strokeWidth="1.5" opacity="0.25" />
-    <path
-      d="M24 6 L40 38 H30 L24 24 L18 38 H8 Z"
-      fill="currentColor"
-      opacity="0.9"
-    />
-    <circle cx="24" cy="16" r="2.5" fill="var(--background, #fff)" />
-  </svg>
-);
 
 const SuggestionIcon: React.FC<{ name: string; className?: string }> = ({ name, className }) => {
   if (name === 'doc') {
@@ -154,7 +143,7 @@ export const HomeView: React.FC = () => {
         </div>
         <div className="flex-1 overflow-auto flex flex-col items-center justify-center px-6 py-10">
           <div className="w-full max-w-2xl flex flex-col items-center animate-scale-in">
-            <AtlasLogo className="w-14 h-14 text-primary mb-5" />
+            <AppIcon className="w-16 h-16 mb-5" />
             <h1 className="text-2xl font-semibold text-foreground tracking-tight mb-6 text-center">
               Como posso ajudar hoje?
             </h1>

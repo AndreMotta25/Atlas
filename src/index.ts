@@ -1,4 +1,5 @@
-import { app, BrowserWindow, nativeTheme, session } from 'electron';
+import { app, BrowserWindow, dialog, nativeTheme, session } from 'electron';
+import path from 'path';
 import { registerAllHandlers } from './ipc';
 import { createChannel } from './types';
 import { ConfigStore } from './vault/config_store';
@@ -15,11 +16,19 @@ if (require('electron-squirrel-startup')) {
   app.quit();
 }
 
+const getWindowIcon = (): string => {
+  const file = app.isPackaged
+    ? path.join(process.resourcesPath, 'build', 'icon.ico')
+    : path.join(__dirname, '..', '..', 'build', 'icon.ico');
+  return file;
+};
+
 const createWindow = (): void => {
   const mainWindow = new BrowserWindow({
     height: 600,
     width: 800,
     show: false,
+    icon: getWindowIcon(),
     webPreferences: {
       preload: MAIN_WINDOW_PRELOAD_WEBPACK_ENTRY,
       contextIsolation: true,
@@ -75,8 +84,20 @@ if (!gotLock) {
   app.whenReady().then(async () => {
     registerAllHandlers();
 
-    // Open the SQLite index DB before any vault work touches it.
-    DatabaseService.open();
+    try {
+      DatabaseService.open();
+    } catch (err) {
+      console.error('[main] failed to open database:', err);
+      const message = err instanceof Error ? err.message : String(err);
+      dialog.showErrorBox(
+        'Atlas — Database error',
+        `Failed to open the local index database.\n\n${message}\n\n` +
+          `If this is the first run, check that %APPDATA%\\atlas is writable ` +
+          `and not blocked by antivirus or Windows Controlled Folder Access.`,
+      );
+      app.quit();
+      return;
+    }
 
     // Restore persisted theme.
     const saved = ConfigStore.load().themeMode ?? 'system';
