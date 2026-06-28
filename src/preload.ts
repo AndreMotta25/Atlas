@@ -196,6 +196,12 @@ const electronAPI = {
     load: (family: string): Promise<{ success: boolean; css?: string; error?: string }> =>
       ipcRenderer.invoke(createChannel('font', 'load'), family),
   },
+
+  // ── Clipboard (uses Electron's native clipboard — doesn't depend on focus) ──
+  clipboard: {
+    writeText: (text: string): Promise<{ success: boolean; error?: string }> =>
+      ipcRenderer.invoke(createChannel('clipboard', 'write'), text),
+  },
 };
 
 contextBridge.exposeInMainWorld('electronAPI', electronAPI);

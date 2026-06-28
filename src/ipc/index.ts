@@ -12,6 +12,7 @@ import { registerToolHandlers } from './tool_handlers';
 import { registerSearchHandlers } from './search_handlers';
 import { registerChatHandlers } from './chat_handlers';
 import { registerFontHandlers } from './font_handlers';
+import { registerClipboardHandlers } from './clipboard_handlers';
 
 export const registerAllHandlers = (): void => {
   registerFileHandlers();
@@ -28,4 +29,6 @@ export const registerAllHandlers = (): void => {
   registerSearchHandlers();
   registerChatHandlers();
   registerFontHandlers();
+  registerClipboardHandlers();
+  console.log('[ipc] all handlers registered');
 };

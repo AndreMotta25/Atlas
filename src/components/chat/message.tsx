@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeRaw from 'rehype-raw';
@@ -8,6 +8,7 @@ import { ConfirmCard } from './confirm_card';
 import { ToolResultCard } from './tool_result_card';
 import { parseActions } from './parse_actions';
 import { useChatStore } from '../../stores/chat_store';
+import { CopyIcon, CheckIcon } from '../icons';
 
 interface MessageProps {
   message: ChatMessage;
@@ -40,6 +41,8 @@ export const Message: React.FC<MessageProps> = ({ message, streaming, isLast }) 
   const send = useChatStore((s) => s.send);
 
   const [actionsUsed, setActionsUsed] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Only parse + render action buttons for the latest assistant message,
   // when not actively streaming, and not yet used.
@@ -48,6 +51,29 @@ export const Message: React.FC<MessageProps> = ({ message, streaming, isLast }) 
     [message.content, isUser],
   );
   const showActions = !isUser && isLast === true && !streaming && actions.length > 0 && !actionsUsed;
+
+  useEffect(() => {
+    return () => {
+      if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
+    };
+  }, []);
+
+  const handleCopy = async () => {
+    const text = (cleanContent ?? message.content).trim();
+    if (!text) return;
+    try {
+      const result = await window.electronAPI.clipboard.writeText(text);
+      if (!result.success) {
+        console.error('Falha ao copiar mensagem:', result.error);
+        return;
+      }
+      setCopied(true);
+      if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
+      copyTimerRef.current = setTimeout(() => setCopied(false), 1500);
+    } catch (err) {
+      console.error('Falha ao copiar mensagem:', err);
+    }
+  };
 
   const hasToolCalls = (message.toolCalls?.length ?? 0) > 0;
   const hasToolResults = (message.toolResults?.length ?? 0) > 0;
@@ -101,6 +127,30 @@ export const Message: React.FC<MessageProps> = ({ message, streaming, isLast }) 
           <div className="text-muted-foreground italic">(vazio)</div>
         ) : null}
       </div>
+
+      {/* Mini copy button — aligned to the same side as the bubble */}
+      {(cleanContent || message.content) && (
+        <div className={`w-full max-w-[90%] flex ${isUser ? 'justify-end' : 'justify-start'}`}>
+          <button
+            type="button"
+            onClick={handleCopy}
+            disabled={streaming && !message.content.trim()}
+            title={copied ? 'Copiado!' : 'Copiar mensagem'}
+            aria-label={copied ? 'Copiado!' : 'Copiar mensagem'}
+            className={`inline-flex items-center justify-center p-1 rounded transition-colors ${
+              copied
+                ? 'text-green-600 dark:text-green-400'
+                : 'text-muted-foreground/70 hover:text-foreground hover:bg-accent'
+            } disabled:opacity-40 disabled:cursor-default`}
+          >
+            {copied ? (
+              <CheckIcon className="w-3.5 h-3.5" />
+            ) : (
+              <CopyIcon className="w-3.5 h-3.5" />
+            )}
+          </button>
+        </div>
+      )}
 
       {/* Quick action buttons (force user interaction instead of typing yes/no) */}
       {showActions && (
