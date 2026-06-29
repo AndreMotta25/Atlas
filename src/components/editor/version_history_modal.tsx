@@ -127,13 +127,15 @@ export const VersionHistoryModal: React.FC<VersionHistoryModalProps> = ({
     }
   };
 
-  // Compute line diff: removed/added lines relative to current content.
+  // Compute line diff from the perspective of "what happens if I restore
+  // this snapshot": diffLines(old=currentContent, new=snapshot.content).
+  //   added   (green/+)  → lines in the snapshot that current is missing
+  //                        (will be ADDED when restoring)
+  //   removed (red/-)    → lines in current that the snapshot lacks
+  //                        (will be REMOVED when restoring)
   const diffParts = (() => {
     if (!selectedFull) return null;
-    // diffLines(old=selectedFull.content, new=currentContent) → parts where
-    //   removed: lines only in the snapshot (gone in current)
-    //   added:   lines only in current (new since snapshot)
-    return diffLines(selectedFull.content, currentContent, { newlineIsToken: false });
+    return diffLines(currentContent, selectedFull.content, { newlineIsToken: false });
   })();
 
   const isIdentical =

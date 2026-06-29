@@ -766,6 +766,52 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
     void content;
   };
 
+  // ── Clipboard operations on the CodeMirror editor ────────────────────────
+  // The renderer is sandboxed, so we use the IPC clipboard — same source as
+  // the chat context menu. These operate on the current EditorView selection.
+  const cutSelection = () => {
+    const view = viewRef.current;
+    if (!view) return;
+    const sel = view.state.selection.main;
+    if (sel.empty) return;
+    const text = view.state.sliceDoc(sel.from, sel.to);
+    void api.clipboard.writeText(text);
+    view.dispatch({ changes: { from: sel.from, to: sel.to, insert: '' } });
+    setMenuPos(null);
+  };
+
+  const copySelection = () => {
+    const view = viewRef.current;
+    if (!view) return;
+    const sel = view.state.selection.main;
+    if (sel.empty) return;
+    const text = view.state.sliceDoc(sel.from, sel.to);
+    void api.clipboard.writeText(text);
+    setMenuPos(null);
+  };
+
+  const pasteFromClipboard = async () => {
+    const view = viewRef.current;
+    if (!view) return;
+    const result = await api.clipboard.readText();
+    if (!result.success || !result.value) return;
+    const sel = view.state.selection.main;
+    view.focus();
+    view.dispatch({
+      changes: { from: sel.from, to: sel.to, insert: result.value },
+      selection: { anchor: sel.from + result.value.length },
+    });
+    setMenuPos(null);
+  };
+
+  const selectAllInEditor = () => {
+    const view = viewRef.current;
+    if (!view) return;
+    const len = view.state.doc.length;
+    view.dispatch({ selection: { anchor: 0, head: len } });
+    setMenuPos(null);
+  };
+
   const sendSelectionToAtlas = () => {
     const view = viewRef.current;
     if (!view) return;
@@ -837,6 +883,16 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
     const SEND_ATLAS = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4"><circle cx="12" cy="12" r="10"/><path d="M16 12l-4 4-4-4M12 8v8"/></svg>`;
 
     return [
+      // ── Clipboard block (matches the chat right-click menu) ──
+      ...(hasSelection
+        ? [
+            { type: 'item' as const, label: 'Recortar', shortcut: 'Ctrl+X', onSelect: cutSelection },
+            { type: 'item' as const, label: 'Copiar', shortcut: 'Ctrl+C', onSelect: copySelection },
+          ]
+        : []),
+      { type: 'item' as const, label: 'Colar', shortcut: 'Ctrl+V', onSelect: () => void pasteFromClipboard() },
+      { type: 'item' as const, label: 'Selecionar tudo', shortcut: 'Ctrl+A', onSelect: selectAllInEditor },
+      { type: 'separator' as const },
       ...(hasSelection
         ? [
             {

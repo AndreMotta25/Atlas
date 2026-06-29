@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useChatStore } from '../../stores/chat_store';
 import { useTextContextMenu } from '../../hooks/use_text_context_menu';
+import { useSelectionContextMenu } from '../../hooks/use_selection_context_menu';
 import { Message } from './message';
 import type { CommentEntry } from '../app_shell';
 import {
@@ -213,6 +214,9 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const sessionMenuRef = useRef<HTMLDivElement | null>(null);
 
+  // Right-click menu on rendered messages (Copy / Select all).
+  const messagesCtxMenu = useSelectionContextMenu(scrollRef);
+
   // Close session menu on outside click
   useEffect(() => {
     if (!sessionMenuOpen) return;
@@ -380,7 +384,11 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
             </div>
           </div>
 
-          <div ref={scrollRef} className="flex-1 overflow-auto p-3 space-y-3 animate-stagger">
+          <div
+            ref={scrollRef}
+            onContextMenu={messagesCtxMenu.onContextMenu}
+            className="flex-1 overflow-auto p-3 space-y-3 animate-stagger"
+          >
             {messages.length === 0 && (
               <p className="text-xs text-muted-foreground opacity-60 text-center mt-8">
                 Converse com o Atlas. Configure sua API key da DeepSeek nas configurações ⚙
@@ -559,6 +567,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
       )}
 
       {chatCtxMenu.menu}
+      {messagesCtxMenu.menu}
     </div>
   );
 };
