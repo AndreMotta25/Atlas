@@ -5,6 +5,7 @@ import { Message } from '../chat/message';
 import { ThinkingIndicator } from '../thinking_indicator';
 import { SendButton } from '../send_button';
 import { ThemeToggle } from '../theme_toggle';
+import { useSelectionContextMenu } from '../../hooks/use_selection_context_menu';
 import { AppIcon } from './app_icon';
 import type { ChatSession, VaultTree } from '../../types';
 
@@ -80,6 +81,9 @@ export const HomeView: React.FC = () => {
 
   const recentPages = useMemo(() => flattenPages(tree).slice(0, 4), [tree]);
   const recentSessions = useMemo(() => sessions.slice(0, 3), [sessions]);
+
+  // Right-click menu on rendered messages (Copy / Select all) — same as ChatPanel.
+  const messagesCtxMenu = useSelectionContextMenu(scrollRef);
 
   useEffect(() => {
     inputRef.current?.focus();
@@ -295,7 +299,11 @@ export const HomeView: React.FC = () => {
         </div>
       </div>
 
-      <div ref={scrollRef} className="flex-1 overflow-auto">
+      <div
+        ref={scrollRef}
+        onContextMenu={messagesCtxMenu.onContextMenu}
+        className="flex-1 overflow-auto"
+      >
         <div className="max-w-3xl mx-auto px-6 pt-6 pb-4 space-y-3">
           {messages.map((m, idx) => (
             <Message
@@ -315,6 +323,7 @@ export const HomeView: React.FC = () => {
       <div className="shrink-0 flex justify-center px-6 pb-6 pt-2">
         {composer}
       </div>
+      {messagesCtxMenu.menu}
     </div>
   );
 };
