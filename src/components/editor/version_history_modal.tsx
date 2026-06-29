@@ -244,9 +244,16 @@ export const VersionHistoryModal: React.FC<VersionHistoryModalProps> = ({
                       ? 'bg-red-500/10 text-red-700 dark:text-red-300'
                       : 'text-muted-foreground';
                   const prefix = part.added ? '+ ' : part.removed ? '- ' : '  ';
+                  // `diffLines` includes the trailing `\n` in each part's value,
+                  // which would produce a phantom empty line after split. Strip
+                  // exactly one trailing newline before splitting — empty lines
+                  // in the middle of a part are preserved.
+                  const text = part.value.endsWith('\n')
+                    ? part.value.slice(0, -1)
+                    : part.value;
                   return (
                     <span key={idx} className={`block ${cls}`}>
-                      {part.value
+                      {text
                         .split('\n')
                         .map((line, i) => (
                           <span key={i} className="block">

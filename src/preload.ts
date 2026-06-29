@@ -205,6 +205,8 @@ const electronAPI = {
   clipboard: {
     writeText: (text: string): Promise<{ success: boolean; error?: string }> =>
       ipcRenderer.invoke(createChannel('clipboard', 'write'), text),
+    readText: (): Promise<{ success: boolean; value: string; error?: string }> =>
+      ipcRenderer.invoke(createChannel('clipboard', 'read')),
   },
 
   // ── Page versions (snapshots stored in SQLite) ──

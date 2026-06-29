@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useChatStore } from '../../stores/chat_store';
+import { useTextContextMenu } from '../../hooks/use_text_context_menu';
 import { Message } from './message';
 import type { CommentEntry } from '../app_shell';
 import {
@@ -189,6 +190,9 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   const cancelChat = useChatStore((s) => s.cancel);
 
   const [chatInput, setChatInput] = useState('');
+
+  const chatTextareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const chatCtxMenu = useTextContextMenu(chatTextareaRef);
 
   const handleChatSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -445,9 +449,11 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
               className="shrink-0 flex gap-2 p-3 border-t border-border bg-background"
             >
               <textarea
+                ref={chatTextareaRef}
                 value={chatInput}
                 onChange={(e) => setChatInput(e.target.value)}
                 onKeyDown={handleChatKeyDown}
+                onContextMenu={chatCtxMenu.onContextMenu}
                 placeholder="Escreva uma mensagem…"
                 rows={2}
                 className="flex-1 resize-none text-sm px-3 py-2 border border-input bg-background text-foreground rounded-xl focus:outline-none focus:border-primary placeholder:text-muted-foreground/60"
@@ -551,6 +557,8 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
           )}
         </>
       )}
+
+      {chatCtxMenu.menu}
     </div>
   );
 };

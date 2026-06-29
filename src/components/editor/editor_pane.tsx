@@ -63,6 +63,7 @@ import {
   insertCodeBlock,
 } from './markdown_actions';
 import { VersionHistoryModal } from './version_history_modal';
+import { useTextContextMenu } from '../../hooks/use_text_context_menu';
 
 const SAVE_DEBOUNCE_MS = 500;
 
@@ -130,6 +131,8 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
   const [dockedWidth, setDockedWidth] = useState<number | null>(null);
   const chatInputDragRef = useRef<{ startX: number; startY: number; origLeft: number; origTop: number } | null>(null);
   const chatInputRef = useRef<HTMLFormElement | null>(null);
+  const chatTextareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const chatCtxMenu = useTextContextMenu(chatTextareaRef);
 
   const getLayoutZones = useCallback((): Record<DockZone, { left: number; width: number }> => {
     const viewportW = window.innerWidth;
@@ -1092,9 +1095,11 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
               </svg>
             </button>
             <textarea
+              ref={chatTextareaRef}
               value={chatInput}
               onChange={(e) => setChatInput(e.target.value)}
               onKeyDown={handleChatKeyDown}
+              onContextMenu={chatCtxMenu.onContextMenu}
               placeholder="Escreva uma mensagem…"
               rows={2}
               className="flex-1 resize-none text-sm px-3 py-2 border border-input bg-background text-foreground rounded-xl focus:outline-none focus:border-primary placeholder:text-muted-foreground/60"
@@ -1146,6 +1151,8 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
           onDelete={deleteFromEdit}
         />
       )}
+
+      {chatCtxMenu.menu}
 
       {confirmDialog}
 
