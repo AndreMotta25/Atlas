@@ -3,7 +3,7 @@ import { randomUUID } from 'crypto';
 import { generateText } from 'ai';
 import { createChannel } from '../types';
 import { AIOrchestrator, type OrchestratorSinks } from '../ai/orchestrator';
-import { createDeepSeek } from '../ai/providers/deepseek';
+import { createChat, type ChatProvider } from '../ai/providers';
 import { ConfigStore } from '../vault/config_store';
 import { SecureStore } from '../vault/secure_store';
 import { VaultManager } from '../vault/manager';
@@ -230,7 +230,15 @@ export const registerAIHandlers = (): void => {
       const apiKey = SecureStore.getApiKey(settings.activeProvider);
       if (!apiKey) return { success: false, error: 'Nenhuma API key configurada.' };
 
-      const chat = createDeepSeek(apiKey);
+      let chat: ReturnType<typeof createChat>;
+      try {
+        chat = createChat(settings.activeProvider as ChatProvider, apiKey);
+      } catch (err) {
+        return {
+          success: false,
+          error: err instanceof Error ? err.message : String(err),
+        };
+      }
       const model = chat(settings.defaultModel);
 
       // Render each message INCLUDING tool calls and tool results — these carry
@@ -318,7 +326,15 @@ Regras:
       const apiKey = SecureStore.getApiKey(settings.activeProvider);
       if (!apiKey) return { success: false, error: 'Nenhuma API key configurada.' };
 
-      const chat = createDeepSeek(apiKey);
+      let chat: ReturnType<typeof createChat>;
+      try {
+        chat = createChat(settings.activeProvider as ChatProvider, apiKey);
+      } catch (err) {
+        return {
+          success: false,
+          error: err instanceof Error ? err.message : String(err),
+        };
+      }
       const model = chat(settings.defaultModel);
 
       try {

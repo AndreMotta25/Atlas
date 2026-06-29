@@ -2,7 +2,7 @@ import { streamText } from 'ai';
 import type { AssistantContent, ModelMessage, ToolCallPart, ToolResultPart } from 'ai';
 import { ConfigStore } from '../vault/config_store';
 import { SecureStore } from '../vault/secure_store';
-import { createDeepSeek } from './providers/deepseek';
+import { createChat, type ChatProvider } from './providers';
 import { TOOLS } from './tools';
 import type {
   ChatMessage,
@@ -212,18 +212,16 @@ class AIOrchestratorClass {
 
     const modelId = opts.model ?? settings.defaultModel;
 
-    if (settings.activeProvider !== 'deepseek') {
-      sinks.chunk({
-        requestId,
-        delta: '',
-        done: false,
-        error: `Provider "${settings.activeProvider}" ainda não implementado.`,
-      });
+    let chat: ReturnType<typeof createChat>;
+    try {
+      chat = createChat(settings.activeProvider as ChatProvider, apiKey);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      sinks.chunk({ requestId, delta: '', done: false, error: msg });
       sinks.chunk({ requestId, delta: '', done: true });
       return { assistantText: '', pendingToolCalls: [] };
     }
 
-    const chat = createDeepSeek(apiKey);
     const model = chat(modelId);
 
     const systemPrompt = settings.systemPrompt?.trim() || DEFAULT_SYSTEM_PROMPT;

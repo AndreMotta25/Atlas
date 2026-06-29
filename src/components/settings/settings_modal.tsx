@@ -14,6 +14,7 @@ interface SettingsModalProps {
 
 const PROVIDERS: { id: AIProvider; label: string; modelPlaceholder: string }[] = [
   { id: 'deepseek', label: 'DeepSeek', modelPlaceholder: 'deepseek-chat' },
+  { id: 'openrouter', label: 'OpenRouter', modelPlaceholder: 'anthropic/claude-3.5-sonnet' },
   { id: 'openai', label: 'OpenAI', modelPlaceholder: 'gpt-4o-mini' },
   { id: 'anthropic', label: 'Anthropic', modelPlaceholder: 'claude-3-5-sonnet' },
   { id: 'ollama', label: 'Ollama', modelPlaceholder: 'llama3.1' },
@@ -263,7 +264,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
               ))}
             </div>
             <p className="text-xs text-muted-foreground mt-2">
-              Apenas DeepSeek está ativo no MVP. Os demais providers entram na Fase 4.
+              DeepSeek e OpenRouter estão ativos. Os demais providers entram em uma fase futura.
             </p>
           </section>
 

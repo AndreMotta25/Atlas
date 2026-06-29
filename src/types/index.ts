@@ -113,7 +113,7 @@ export interface RestoreVersionResult {
 }
 
 // ─── AI Types ───────────────────────────────────────────────────
-export type AIProvider = 'deepseek' | 'openai' | 'anthropic' | 'ollama' | 'tavily';
+export type AIProvider = 'deepseek' | 'openrouter' | 'openai' | 'anthropic' | 'ollama' | 'tavily';
 
 export interface ChatMessage {
   id: string;

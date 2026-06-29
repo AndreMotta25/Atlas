@@ -11,6 +11,7 @@ import type { AIProvider, AppSettings } from '../types';
  */
 const MODELS_ENDPOINTS: Partial<Record<AIProvider, string>> = {
   deepseek: 'https://api.deepseek.com/models',
+  openrouter: 'https://openrouter.ai/api/v1/models',
 };
 
 export const registerSettingsHandlers = (): void => {
