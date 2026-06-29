@@ -716,6 +716,9 @@ export const AppShell: React.FC = () => {
             chatTab={chatTab}
             onSetTab={setChatTab}
             commentCount={comments.length}
+            chatWidth={chatWidth}
+            sidebarWidth={sidebarWidth}
+            sidebarVisible={sidebarVisible}
           />
         </div>
         {viewingGraph && <GraphView />}

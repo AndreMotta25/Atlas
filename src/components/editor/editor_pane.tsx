@@ -25,7 +25,7 @@ import { tags } from '@lezer/highlight';
 import { searchKeymap, highlightSelectionMatches } from '@codemirror/search';
 import { closeBrackets, closeBracketsKeymap, autocompletion } from '@codemirror/autocomplete';
 import { linter } from '@codemirror/lint';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useVaultStore } from '../../stores/vault_store';
 import { useChatStore } from '../../stores/chat_store';
 import { useSettingsStore } from '../../stores/settings_store';
@@ -80,9 +80,25 @@ interface EditorPaneProps {
   chatTab: 'chat' | 'comments';
   onSetTab: (tab: 'chat' | 'comments') => void;
   commentCount: number;
+  /** Layout info needed to snap the floating chat input between editor and chat. */
+  chatWidth: number;
+  sidebarWidth: number;
+  sidebarVisible: boolean;
 }
 
-export const EditorPane: React.FC<EditorPaneProps> = ({ onCommentsChange, onCommentSelect, deleteCommentRef, updateCommentRef, scrollToCommentRef, chatTab, onSetTab, commentCount }) => {
+export const EditorPane: React.FC<EditorPaneProps> = ({
+  onCommentsChange,
+  onCommentSelect,
+  deleteCommentRef,
+  updateCommentRef,
+  scrollToCommentRef,
+  chatTab,
+  onSetTab,
+  commentCount,
+  chatWidth,
+  sidebarWidth,
+  sidebarVisible,
+}) => {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const viewRef = useRef<EditorView | null>(null);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -104,10 +120,78 @@ export const EditorPane: React.FC<EditorPaneProps> = ({ onCommentsChange, onComm
 
   const [chatInput, setChatInput] = useState('');
 
-  // Floating chat input drag — null = default centered-bottom position.
+  // ── Floating chat input drag + snap ───────────────────────────────────────
+  type DockZone = 'editor' | 'chat';
   const [chatInputPos, setChatInputPos] = useState<{ left: number; top: number } | null>(null);
+  const [dockedZone, setDockedZone] = useState<DockZone | null>(null);
+  const [previewZone, setPreviewZone] = useState<DockZone | null>(null);
+  const [isDraggingInput, setIsDraggingInput] = useState(false);
+  const [dockedWidth, setDockedWidth] = useState<number | null>(null);
   const chatInputDragRef = useRef<{ startX: number; startY: number; origLeft: number; origTop: number } | null>(null);
   const chatInputRef = useRef<HTMLFormElement | null>(null);
+
+  const getLayoutZones = useCallback((): Record<DockZone, { left: number; width: number }> => {
+    const viewportW = window.innerWidth;
+    const sidebarW = sidebarVisible ? sidebarWidth : 0;
+    const editorW = Math.max(0, viewportW - sidebarW - chatWidth);
+    return {
+      editor: { left: sidebarW, width: editorW },
+      chat: { left: viewportW - chatWidth, width: chatWidth },
+    };
+  }, [chatWidth, sidebarWidth, sidebarVisible]);
+
+  const getInputRect = useCallback((): DOMRect | null => {
+    return chatInputRef.current?.getBoundingClientRect() ?? null;
+  }, []);
+
+  const computeSnapPosition = useCallback((zone: DockZone): { left: number; top: number; width: number } => {
+    const zones = getLayoutZones();
+    const z = zones[zone];
+    const rect = getInputRect();
+    const inputW = rect?.width ?? 560;
+    const inputH = rect?.height ?? 64;
+    const bottomMargin = 12;
+    const targetWidth = zone === 'chat' ? Math.min(560, Math.max(280, z.width - 24)) : inputW;
+    return {
+      left: z.left + z.width / 2 - targetWidth / 2,
+      top: window.innerHeight - inputH - bottomMargin,
+      width: targetWidth,
+    };
+  }, [getInputRect, getLayoutZones]);
+
+  const detectZone = useCallback((x: number, y: number): DockZone | null => {
+    const zones = getLayoutZones();
+    const h = window.innerHeight;
+    if (x >= zones.editor.left && x <= zones.editor.left + zones.editor.width && y >= 0 && y <= h) {
+      return 'editor';
+    }
+    if (x >= zones.chat.left && x <= zones.chat.left + zones.chat.width && y >= 0 && y <= h) {
+      return 'chat';
+    }
+    return null;
+  }, [getLayoutZones]);
+
+  const snapToZone = useCallback((zone: DockZone) => {
+    const target = computeSnapPosition(zone);
+    setChatInputPos({ left: target.left, top: target.top });
+    setDockedZone(zone);
+    setDockedWidth(zone === 'chat' ? target.width : null);
+    setPreviewZone(null);
+  }, [computeSnapPosition]);
+
+  // Recompute snap position when layout changes while docked.
+  useEffect(() => {
+    if (!dockedZone) return;
+    snapToZone(dockedZone);
+  }, [dockedZone, snapToZone, chatWidth, sidebarWidth, sidebarVisible]);
+
+  // Also recompute on window resize.
+  useEffect(() => {
+    if (!dockedZone) return;
+    const onResize = () => snapToZone(dockedZone);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, [dockedZone, snapToZone]);
 
   const onChatInputDragStart = (e: React.MouseEvent) => {
     if (e.button !== 0) return;
@@ -121,25 +205,47 @@ export const EditorPane: React.FC<EditorPaneProps> = ({ onCommentsChange, onComm
       origLeft: rect.left,
       origTop: rect.top,
     };
+    setIsDraggingInput(true);
+    setDockedZone(null);
+    setDockedWidth(null);
   };
 
   useEffect(() => {
     const onMove = (e: MouseEvent) => {
       const d = chatInputDragRef.current;
       if (!d) return;
-      setChatInputPos({
-        left: d.origLeft + (e.clientX - d.startX),
-        top: d.origTop + (e.clientY - d.startY),
-      });
+      const nextLeft = d.origLeft + (e.clientX - d.startX);
+      const nextTop = d.origTop + (e.clientY - d.startY);
+      setChatInputPos({ left: nextLeft, top: nextTop });
+      const rect = getInputRect();
+      const cx = nextLeft + (rect?.width ?? 280) / 2;
+      const cy = nextTop + (rect?.height ?? 64) / 2;
+      setPreviewZone(detectZone(cx, cy));
     };
-    const onUp = () => { chatInputDragRef.current = null; };
+    const onUp = () => {
+      const d = chatInputDragRef.current;
+      if (!d) return;
+      chatInputDragRef.current = null;
+      setIsDraggingInput(false);
+      const rect = getInputRect();
+      const cx = (rect?.left ?? 0) + (rect?.width ?? 280) / 2;
+      const cy = (rect?.top ?? 0) + (rect?.height ?? 64) / 2;
+      const zone = detectZone(cx, cy);
+      if (zone) {
+        snapToZone(zone);
+      } else {
+        setDockedZone(null);
+        setDockedWidth(null);
+        setPreviewZone(null);
+      }
+    };
     window.addEventListener('mousemove', onMove);
     window.addEventListener('mouseup', onUp);
     return () => {
       window.removeEventListener('mousemove', onMove);
       window.removeEventListener('mouseup', onUp);
     };
-  }, []);
+  }, [detectZone, getInputRect, snapToZone]);
 
   const [menuPos, setMenuPos] = useState<{ x: number; y: number } | null>(null);
   const [renaming, setRenaming] = useState(false);
@@ -891,16 +997,30 @@ export const EditorPane: React.FC<EditorPaneProps> = ({ onCommentsChange, onComm
           <form
             ref={chatInputRef}
             onSubmit={handleChatSubmit}
-            className="fixed z-50 w-[min(560px,92%)] flex items-center gap-2 p-2 bg-card border border-border rounded-2xl shadow-lg focus-within:border-primary/50 transition-colors"
+            className={`fixed z-50 flex items-center gap-2 p-2 bg-card border rounded-2xl shadow-lg focus-within:border-primary/50 ${
+              dockedWidth ? '' : 'w-[min(560px,92%)]'
+            } ${
+              previewZone
+                ? previewZone === 'chat'
+                  ? 'border-primary ring-2 ring-primary/30'
+                  : 'border-primary/70'
+                : dockedZone === 'chat'
+                  ? 'border-border'
+                  : 'border-border'
+            } ${isDraggingInput ? '' : 'transition-all duration-200 ease-out'}`}
             style={chatInputPos
-              ? { left: chatInputPos.left, top: chatInputPos.top }
+              ? { left: chatInputPos.left, top: chatInputPos.top, width: dockedWidth ?? undefined }
               : { left: '50%', bottom: '0.75rem', transform: 'translateX(-50%)' }}
           >
             {/* Drag grip — sits just above the input */}
             <button
               type="button"
               onMouseDown={onChatInputDragStart}
-              onDoubleClick={() => setChatInputPos(null)}
+              onDoubleClick={() => {
+                setChatInputPos(null);
+                setDockedZone(null);
+                setDockedWidth(null);
+              }}
               className="absolute -top-3 left-1/2 -translate-x-1/2 flex items-center justify-center w-7 h-5 cursor-grab active:cursor-grabbing rounded-md bg-card border border-border shadow-md text-muted-foreground/60 hover:text-muted-foreground hover:bg-accent transition-colors"
               title="Arraste para mover · duplo-clique para redefinir"
               aria-label="Mover input"
