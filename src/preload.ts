@@ -9,9 +9,13 @@ import type {
   ChatSearchResult,
   ChatSession,
   ChatStreamChunk,
+  CreateVersionInput,
   GraphData,
   PageContent,
+  PageVersion,
+  PageVersionMeta,
   PendingToolCall,
+  RestoreVersionResult,
   SearchResult,
   TagResult,
   TagPageResult,
@@ -201,6 +205,20 @@ const electronAPI = {
   clipboard: {
     writeText: (text: string): Promise<{ success: boolean; error?: string }> =>
       ipcRenderer.invoke(createChannel('clipboard', 'write'), text),
+  },
+
+  // ── Page versions (snapshots stored in SQLite) ──
+  versions: {
+    create: (input: CreateVersionInput): Promise<{ success: boolean; id?: number; error?: string }> =>
+      ipcRenderer.invoke(createChannel('version', 'create'), input),
+    list: (path: string): Promise<PageVersionMeta[]> =>
+      ipcRenderer.invoke(createChannel('version', 'list'), path),
+    get: (id: number): Promise<PageVersion | null> =>
+      ipcRenderer.invoke(createChannel('version', 'get'), id),
+    restore: (id: number): Promise<RestoreVersionResult> =>
+      ipcRenderer.invoke(createChannel('version', 'restore'), id),
+    delete: (id: number): Promise<{ success: boolean; error?: string }> =>
+      ipcRenderer.invoke(createChannel('version', 'delete'), id),
   },
 };
 

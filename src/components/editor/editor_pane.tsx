@@ -45,7 +45,7 @@ import {
   type CommentEntry,
 } from './comment_parser';
 import {
-  ChatIcon, FormatIcon, EyeIcon, PencilIcon, TrashIcon, SendIcon,
+  ChatIcon, FormatIcon, EyeIcon, PencilIcon, TrashIcon, SendIcon, ClockIcon,
 } from '../icons';
 import { SendButton } from '../send_button';
 import { HIGHLIGHT_COLORS, DEFAULT_HIGHLIGHT_COLOR, type HighlightColor } from '../../types';
@@ -62,6 +62,7 @@ import {
   insertCheckbox,
   insertCodeBlock,
 } from './markdown_actions';
+import { VersionHistoryModal } from './version_history_modal';
 
 const SAVE_DEBOUNCE_MS = 500;
 
@@ -250,6 +251,10 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
   const [menuPos, setMenuPos] = useState<{ x: number; y: number } | null>(null);
   const [renaming, setRenaming] = useState(false);
   const [renameDraft, setRenameDraft] = useState('');
+
+  // ── Page versioning ────────────────────────────────────────────────────────
+  const [showHistory, setShowHistory] = useState(false);
+  const [versionToast, setVersionToast] = useState<string | null>(null);
 
   // Debug toggle for live preview mode (Alt+L cycles 0 → 1 → 2 → 0).
   const [previewMode, setPreviewMode] = useState<LivePreviewMode>(0);
@@ -726,6 +731,38 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
     chatStore.loadPageContext(currentPath);
   };
 
+  const handleSaveVersion = async () => {
+    if (!currentPath) return;
+    const view = viewRef.current;
+    const content = view ? view.state.doc.toString() : liveDoc;
+    try {
+      const result = await api.versions.create({
+        path: currentPath,
+        content,
+        source: 'manual',
+      });
+      if (result.success) {
+        setVersionToast('Versão salva');
+        setTimeout(() => setVersionToast(null), 2200);
+      } else {
+        setVersionToast(result.error ?? 'Erro ao salvar versão');
+        setTimeout(() => setVersionToast(null), 3200);
+      }
+    } catch (err) {
+      setVersionToast(err instanceof Error ? err.message : 'Erro ao salvar versão');
+      setTimeout(() => setVersionToast(null), 3200);
+    }
+  };
+
+  const handleRestoredFromHistory = async (path: string, content: string) => {
+    // Reload through the store so the editor effect picks up the new content.
+    const openPage = useVaultStore.getState().openPage;
+    await openPage(path);
+    // The store's openPage reads from disk — which we just wrote — so content
+    // will match. No-op if already in sync.
+    void content;
+  };
+
   const sendSelectionToAtlas = () => {
     const view = viewRef.current;
     if (!view) return;
@@ -875,6 +912,26 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
                     aria-label="Adicionar página ao Atlas"
                   >
                     <SendIcon className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => void handleSaveVersion()}
+                    className="p-1.5 hover:bg-accent rounded text-muted-foreground hover:text-foreground transition-colors"
+                    title="Salvar versão"
+                    aria-label="Salvar versão"
+                  >
+                    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
+                      <path d="M3 2h8l3 3v9a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1Z" />
+                      <path d="M5 2v3h5V2" />
+                      <rect x="5" y="9" width="6" height="4" rx="0.5" />
+                    </svg>
+                  </button>
+                  <button
+                    onClick={() => setShowHistory(true)}
+                    className="p-1.5 hover:bg-accent rounded text-muted-foreground hover:text-foreground transition-colors"
+                    title="Histórico de versões"
+                    aria-label="Histórico de versões"
+                  >
+                    <ClockIcon className="w-4 h-4" />
                   </button>
                   <button
                     onClick={startRename}
@@ -1091,6 +1148,21 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
       )}
 
       {confirmDialog}
+
+      {showHistory && currentPath && (
+        <VersionHistoryModal
+          pagePath={currentPath}
+          currentContent={liveDoc}
+          onClose={() => setShowHistory(false)}
+          onRestored={(path, content) => void handleRestoredFromHistory(path, content)}
+        />
+      )}
+
+      {versionToast && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[60] px-4 py-2 rounded-md bg-foreground text-background text-sm shadow-lg animate-fade-in">
+          {versionToast}
+        </div>
+      )}
     </div>
   );
 };

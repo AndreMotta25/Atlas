@@ -2,16 +2,17 @@ import Database from 'better-sqlite3';
 import type { Database as DB } from 'better-sqlite3';
 import { app } from 'electron';
 import * as path from 'path';
-import type { BacklinkResult, ChatMessage, ChatSearchResult, ChatSession, GraphData, GraphEdge, GraphNode, SearchResult, TagResult, TagPageResult } from '../types';
+import type { BacklinkResult, ChatMessage, ChatSearchResult, ChatSession, CreateVersionInput, GraphData, GraphEdge, GraphNode, PageVersion, PageVersionMeta, SearchResult, TagResult, TagPageResult } from '../types';
 
 /**
  * SQLite layer for the Atlas vault index.
  *
  * Tables:
- *   - pages        (id, path UNIQUE, title, mtime, size)
- *   - links        (from_page → pages.id, to_path, anchor)
- *   - tags         (page_id → pages.id, tag)
- *   - pages_fts    (FTS5 over path/title/content — standalone, manually synced)
+ *   - pages          (id, path UNIQUE, title, mtime, size)
+ *   - links          (from_page → pages.id, to_path, anchor)
+ *   - tags           (page_id → pages.id, tag)
+ *   - pages_fts      (FTS5 over path/title/content — standalone, manually synced)
+ *   - page_versions  (id, path, content, size, created_at, source, label)
  *
  * FTS5 uses unicode61 with remove_diacritics=2 so accented Portuguese queries
  * match unaccented text and vice-versa.
@@ -106,6 +107,18 @@ class DatabaseServiceClass {
         message_id UNINDEXED,
         tokenize = "unicode61 remove_diacritics 2 categories 'L* N* Co'"
       );
+
+      CREATE TABLE IF NOT EXISTS page_versions (
+        id          INTEGER PRIMARY KEY,
+        path        TEXT NOT NULL,
+        content     TEXT NOT NULL,
+        size        INTEGER NOT NULL,
+        created_at  INTEGER NOT NULL,
+        source      TEXT NOT NULL DEFAULT 'manual',
+        label       TEXT
+      );
+      CREATE INDEX IF NOT EXISTS idx_versions_path_time
+        ON page_versions(path, created_at DESC);
     `);
 
     if (current < 1) {
@@ -113,6 +126,9 @@ class DatabaseServiceClass {
     }
     if (current < 2) {
       this.db.pragma('user_version = 2');
+    }
+    if (current < 3) {
+      this.db.pragma('user_version = 3');
     }
   }
 
@@ -562,6 +578,61 @@ class DatabaseServiceClass {
     } catch {
       return [];
     }
+  }
+
+  // ── Page versions ─────────────────────────────────────────────
+
+  /**
+   * Insert a snapshot of a page's content. Snapshots are full content (not diffs) —
+   * Markdown pages are typically small and this makes restore O(1).
+   * `source='pre-restore'` is used when capturing the current state right before
+   * overwriting it with a restored version, so the user can undo a restore.
+   */
+  createVersion(opts: CreateVersionInput): number {
+    const db = this.requireOpen();
+    const source = opts.source ?? 'manual';
+    const label = opts.label ?? null;
+    const info = db.prepare(
+      `INSERT INTO page_versions (path, content, size, created_at, source, label)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+    ).run(opts.path, opts.content, opts.content.length, Date.now(), source, label);
+    return Number(info.lastInsertRowid);
+  }
+
+  /** List version metadata for a page, most recent first. Excludes content. */
+  listVersions(pagePath: string): PageVersionMeta[] {
+    const db = this.requireOpen();
+    const rows = db.prepare(
+      `SELECT id, path, size, created_at AS createdAt, source, label
+       FROM page_versions
+       WHERE path = ?
+       ORDER BY created_at DESC`,
+    ).all(pagePath) as Array<{
+      id: number;
+      path: string;
+      size: number;
+      createdAt: number;
+      source: 'manual' | 'pre-restore';
+      label: string | null;
+    }>;
+    return rows;
+  }
+
+  /** Load a single version including content, or null if not found. */
+  getVersion(id: number): PageVersion | null {
+    const db = this.requireOpen();
+    const row = db.prepare(
+      `SELECT id, path, content, size, created_at AS createdAt, source, label
+       FROM page_versions
+       WHERE id = ?`,
+    ).get(id) as PageVersion | undefined;
+    return row ?? null;
+  }
+
+  /** Delete a single version snapshot. */
+  deleteVersion(id: number): void {
+    const db = this.requireOpen();
+    db.prepare('DELETE FROM page_versions WHERE id = ?').run(id);
   }
 
   /** Throws if the DB hasn't been opened. Use inside methods that use `db` in closures. */

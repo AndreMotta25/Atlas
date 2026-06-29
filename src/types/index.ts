@@ -82,6 +82,36 @@ export interface VaultStatus {
   root: string | null;
 }
 
+// ─── Page Versions ──────────────────────────────────────────────
+export type PageVersionSource = 'manual' | 'pre-restore';
+
+export interface PageVersionMeta {
+  id: number;
+  path: string;
+  size: number;
+  createdAt: number;
+  source: PageVersionSource;
+  label: string | null;
+}
+
+export interface PageVersion extends PageVersionMeta {
+  content: string;
+}
+
+export interface CreateVersionInput {
+  path: string;
+  content: string;
+  label?: string | null;
+  source?: PageVersionSource;
+}
+
+export interface RestoreVersionResult {
+  success: boolean;
+  path?: string;
+  content?: string;
+  error?: string;
+}
+
 // ─── AI Types ───────────────────────────────────────────────────
 export type AIProvider = 'deepseek' | 'openai' | 'anthropic' | 'ollama' | 'tavily';
 
