@@ -1,5 +1,6 @@
-import { app, BrowserWindow, dialog, nativeTheme, session } from 'electron';
+import { app, BrowserWindow, dialog, nativeTheme, session, protocol, net } from 'electron';
 import path from 'path';
+import { pathToFileURL } from 'url';
 import { registerAllHandlers } from './ipc';
 import { createChannel } from './types';
 import { ConfigStore } from './vault/config_store';
@@ -9,6 +10,17 @@ import { Indexer } from './vault/indexer';
 
 declare const MAIN_WINDOW_WEBPACK_ENTRY: string;
 declare const MAIN_WINDOW_PRELOAD_WEBPACK_ENTRY: string;
+
+// Register the atlas-img:// scheme as privileged BEFORE app.whenReady().
+// Required so Electron treats it as a standard, secure, fetch-capable scheme.
+// Without this, protocol.handle would still respond but CSP/CORS and the
+// <img> loading pipeline would reject it.
+protocol.registerSchemesAsPrivileged([
+  {
+    scheme: 'atlas-img',
+    privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true },
+  },
+]);
 
 const ALLOWED_PERMISSIONS = ['notifications', 'clipboard-read'];
 
@@ -83,6 +95,34 @@ if (!gotLock) {
 
   app.whenReady().then(async () => {
     registerAllHandlers();
+
+    // Custom protocol that serves image files from the current vault root.
+    // Renderer references images as `atlas-img://anexos/foo.png` — the handler
+    // resolves the relative path against VaultManager.getRoot() and streams the
+    // bytes via net.fetch. Path traversal is blocked (abs must remain inside root).
+    protocol.handle('atlas-img', async (request) => {
+      const root = VaultManager.getRoot();
+      console.log('[atlas-img] request:', request.url, 'root:', root);
+      if (!root) return new Response('vault not configured', { status: 404 });
+      const u = new URL(request.url);
+      // host holds the first segment; pathname the rest. Decode both.
+      const relPath = decodeURIComponent(`${u.host}${u.pathname}`);
+      const abs = path.resolve(root, relPath);
+      console.log('[atlas-img] resolved abs:', abs);
+      if (abs !== root && !abs.startsWith(root + path.sep)) {
+        console.warn('[atlas-img] forbidden (outside vault root)');
+        return new Response('forbidden', { status: 403 });
+      }
+      try {
+        const fileUrl = pathToFileURL(abs).toString();
+        const res = await net.fetch(fileUrl);
+        console.log('[atlas-img] fetch ok, status:', res.status, 'size:', res.headers.get('content-length'));
+        return res;
+      } catch (err) {
+        console.error('[atlas-img] fetch failed:', err);
+        return new Response('not found', { status: 404 });
+      }
+    });
 
     try {
       DatabaseService.open();

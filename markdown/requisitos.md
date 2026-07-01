@@ -37,5 +37,12 @@
 [x] - Permitir que o modelo faça buscas na internet
 [x] - Colocar um botão no chat do atlas para mover ele.
 [x] - No atlas já tem um botão para transformar ele em uma bola que fica na parte inferior da tela, mas acho que seria interesante ter um botão que desprendesse o atlas da pagina, tipo, ficar flutuando e tomando conta da tela.
-[ ] - Colocar um login com conta externa para salvar os arquivos online - Drive.
-[ ] - Colocar o sistema de grafos.
+[] - Colocar um login com conta externa para salvar os arquivos online - Drive.
+[x] - Colocar o sistema de grafos.
+[x] - Quando clicar com o botão direito do mouse em cima de uma pasta, permitir criar uma pagina direto dentro da pasta clicada.
+[x] - Colocar um mini botão para copiar abaixo de cada conversa.
+[] - Colocar o modo pensamento no atlas.
+[x] - Colocar um versionamento de paginas no atlas.
+[] - Quando uma pagina já está linkada ao atlas pelo botão toggle, eu não consigo colocar outra.
+[x] - Prender o chat e não deixar solto.
+[] - Colocar o modelo para resumir o que foi alterado em uma versão da pagina.

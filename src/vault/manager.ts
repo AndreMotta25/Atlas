@@ -107,6 +107,13 @@ class VaultManagerClass {
     await fsp.writeFile(abs, content, 'utf-8');
   }
 
+  /** Write binary data (e.g. an image buffer) to a path inside the vault. */
+  async writeFile(relPath: string, data: Buffer): Promise<void> {
+    const abs = this.resolve(relPath);
+    await fsp.mkdir(path.dirname(abs), { recursive: true });
+    await fsp.writeFile(abs, data);
+  }
+
   async createFolder(relPath: string): Promise<void> {
     const abs = this.resolve(relPath);
     await fsp.mkdir(abs, { recursive: true });

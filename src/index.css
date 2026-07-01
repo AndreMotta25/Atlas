@@ -553,6 +553,17 @@ input {
   cursor: pointer;
 }
 
+/* Rendered <img> block — replaces the markdown stub when cursor is outside.
+   Shown by the ImageWidget (live_preview.ts). */
+.atlas-img-rendered {
+  max-width: 100%;
+  height: auto;
+  border-radius: 6px;
+  display: inline-block;
+  margin: 4px 0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+}
+
 /* ─── HTML blocks ───────────────────────────────────────────────── */
 
 /* ══════════════════════════════════════════════════════════════════

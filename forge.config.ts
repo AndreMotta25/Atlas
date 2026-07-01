@@ -40,6 +40,15 @@ const config: ForgeConfig = {
     new AutoUnpackNativesPlugin({}),
     new WebpackPlugin({
       mainConfig,
+      // Override the dev server's default CSP (which doesn't include atlas-img:).
+      // Must match the <meta> in src/index.html so dev and packaged behavior agree.
+      devContentSecurityPolicy:
+        "default-src 'self'; script-src 'self' 'unsafe-eval' 'unsafe-inline' http://localhost:*; " +
+        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
+        "font-src 'self' https://fonts.gstatic.com data:; " +
+        "connect-src 'self' http://localhost:* ws://localhost:*; " +
+        "img-src 'self' data: blob: atlas-img: https:; " +
+        "object-src 'none'; base-uri 'none'; form-action 'none';",
       renderer: {
         config: rendererConfig,
         entryPoints: [

@@ -29,12 +29,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useVaultStore } from '../../stores/vault_store';
 import { useChatStore } from '../../stores/chat_store';
 import { useSettingsStore } from '../../stores/settings_store';
-import { livePreview, livePreviewModeField, setLivePreviewMode, tableWidgetField, tableViewportPlugin, type LivePreviewMode } from './live_preview';
+import { livePreview, livePreviewModeField, setLivePreviewMode, tableWidgetField, tableViewportPlugin, imageWidgetField, imageViewportPlugin, type LivePreviewMode } from './live_preview';
 import { formatMarkdown } from './format_markdown';
 import { atlasCompletionSources } from './autocomplete_source';
 import { markdownLintSource } from './markdown_lint';
 import { markdownFoldService } from './markdown_fold';
 import { stickyHeaderPlugin } from './sticky_header';
+import { imageDropAndPaste } from './image_drop_paste';
 import { ContextMenu, type MenuEntry } from './context_menu';
 import { CommentPopup } from './comment_popup';
 import { useConfirm } from '../confirm_dialog';
@@ -499,9 +500,14 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
         livePreview,
         tableWidgetField,
         tableViewportPlugin,
+        imageWidgetField,
+        imageViewportPlugin,
 
         // ── Sticky headers ─────────────────────────────────
         stickyHeaderPlugin,
+
+        // ── Image drag/drop & paste ────────────────────────
+        imageDropAndPaste(),
 
         // ── Keymaps ────────────────────────────────────────
         keymap.of([
@@ -915,7 +921,7 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
       { type: 'item', label: 'Bloco de código', icon: CODEBLOCK, shortcut: '```', onSelect: () => insertCodeBlock(view) },
       { type: 'separator' },
       { type: 'item', label: 'Link',     icon: LINK, shortcut: '[]()',  onSelect: () => insertLink(view) },
-      { type: 'item', label: 'Imagem',   icon: IMAGE, shortcut: '![]()', onSelect: () => insertImage(view) },
+      { type: 'item', label: 'Imagem',   icon: IMAGE, shortcut: '![]()', onSelect: () => { void insertImage(view); } },
       { type: 'separator' },
       { type: 'item', label: 'Citação',  icon: QUOTE, shortcut: '>',    onSelect: () => toggleLinePrefix(view, '>') },
       { type: 'item', label: 'Lista',    icon: LIST, shortcut: '-',     onSelect: () => toggleLinePrefix(view, '-') },

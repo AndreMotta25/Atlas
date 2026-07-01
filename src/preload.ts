@@ -1,4 +1,4 @@
-import { contextBridge, ipcRenderer } from 'electron';
+import { contextBridge, ipcRenderer, webUtils } from 'electron';
 import { createChannel } from './types';
 import type {
   AIProvider,
@@ -11,6 +11,8 @@ import type {
   ChatStreamChunk,
   CreateVersionInput,
   GraphData,
+  ImageImportResult,
+  ImageSaveBufferPayload,
   PageContent,
   PageVersion,
   PageVersionMeta,
@@ -222,6 +224,19 @@ const electronAPI = {
     delete: (id: number): Promise<{ success: boolean; error?: string }> =>
       ipcRenderer.invoke(createChannel('version', 'delete'), id),
   },
+
+  // ── Images (drag/drop, paste, import-from-path, download-from-url) ──
+  image: {
+    saveBuffer: (payload: ImageSaveBufferPayload): Promise<ImageImportResult> =>
+      ipcRenderer.invoke(createChannel('image', 'save-buffer'), payload),
+    importFromPath: (absPath: string): Promise<ImageImportResult> =>
+      ipcRenderer.invoke(createChannel('image', 'import-from-path'), absPath),
+    downloadFromUrl: (url: string): Promise<ImageImportResult> =>
+      ipcRenderer.invoke(createChannel('image', 'download-from-url'), url),
+  },
+
+  // ── Drag-and-drop file path resolution (Electron sandbox-safe) ──
+  getPathForFile: (file: File): string => webUtils.getPathForFile(file),
 };
 
 contextBridge.exposeInMainWorld('electronAPI', electronAPI);

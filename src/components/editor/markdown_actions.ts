@@ -1,5 +1,6 @@
 import { EditorSelection, EditorState } from '@codemirror/state';
 import type { EditorView } from '@codemirror/view';
+import { api } from '../../lib/api';
 
 const PLACEHOLDER = 'texto';
 
@@ -121,18 +122,29 @@ export function changeIndent(view: EditorView, delta: 2 | -2): void {
   view.focus();
 }
 
-/** Insert an image `![alt](url)` at cursor or wrapping the selection. */
-export function insertImage(view: EditorView): void {
-  const sel = view.state.selection.main;
-  const selected = view.state.doc.sliceString(sel.from, sel.to);
-  const alt = selected.length > 0 ? selected : 'descrição';
-  const insert = `![${alt}](url)`;
-  const urlStart = sel.from + 2 + alt.length + 2;
-  view.dispatch({
-    changes: { from: sel.from, to: sel.to, insert },
-    selection: EditorSelection.range(urlStart, urlStart + 3),
-  });
-  view.focus();
+/**
+ * Open a native file picker, import the chosen image into `anexos/` via IPC,
+ * and insert the markdown reference at the cursor. Falls back to a placeholder
+ * stub if the user cancels or import fails.
+ */
+export async function insertImage(view: EditorView): Promise<void> {
+  try {
+    const result = await api.openFileDialog();
+    if (result.canceled || !result.filePaths?.[0]) return;
+    const imported = await api.image.importFromPath(result.filePaths[0]);
+    if (!imported.success || !imported.relPath) return;
+    const sel = view.state.selection.main;
+    const selected = view.state.doc.sliceString(sel.from, sel.to);
+    const alt = selected.length > 0 ? selected : 'imagem';
+    const insert = `![${alt}](${imported.relPath})`;
+    view.dispatch({
+      changes: { from: sel.from, to: sel.to, insert },
+      selection: EditorSelection.cursor(sel.from + insert.length),
+    });
+    view.focus();
+  } catch (err) {
+    console.error('[insertImage] failed:', err);
+  }
 }
 
 /** Insert a GFM table template at cursor. */

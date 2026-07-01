@@ -10,6 +10,7 @@ import {
 import { syntaxTree, ensureSyntaxTree } from '@codemirror/language';
 import type { SyntaxNode, SyntaxNodeRef } from '@lezer/common';
 import { parseAnnotation } from './comment_parser';
+import { ImageWidget, resolveImageSrc } from './image_widget';
 
 /**
  * Live Preview para o editor Atlas.
@@ -421,12 +422,126 @@ function decorateTaskList(state: EditorState, ref: SyntaxNodeRef, decos: Range<D
   }
 }
 
-function decorateImage(ref: SyntaxNodeRef, decos: Range<Decoration>[]) {
+/**
+ * Apply raw-text styling for an Image node ONLY when the selection intersects
+ * it (editing mode). When the selection is outside, `imageWidgetField` emits a
+ * block widget that replaces the whole range — emitting competing mark/replace
+ * decorations here would conflict with it and prevent `toDOM()` from running.
+ */
+function decorateImage(view: EditorView, ref: SyntaxNodeRef, decos: Range<Decoration>[]) {
+  const sel = view.state.selection.main;
+  const intersects = sel.from <= ref.to && sel.to >= ref.from;
+  if (!intersects) return;
   safeMark('atlas-image', ref.from, ref.to, decos);
   for (const child of iterChildren(ref)) {
     if (child.name === 'LinkMark') hideRange(child.from, child.to, decos);
   }
 }
+
+/** Extract the URL and alt text from an Image syntax node. */
+function parseImageNode(state: EditorState, ref: SyntaxNodeRef): { url: string; alt: string } | null {
+  let url = '';
+  let alt = '';
+  for (const child of iterChildren(ref)) {
+    if (child.name === 'URL') {
+      url = state.doc.sliceString(child.from, child.to).trim();
+    } else if (child.name === 'LinkLabel') {
+      // Reference-style images — not common here, skip for now.
+    }
+  }
+  // Alt text: the inline content between ![ and ]. Walk children to collect text.
+  // For simplicity, take the raw text inside the node minus the URL/LinkMark parts.
+  // Most reliable: slice from after '!' to the ']('.
+  const full = state.doc.sliceString(ref.from, ref.to);
+  const m = /^!\[([\s\S]*?)\]\(([\s\S]*?)\)$/.exec(full);
+  if (m) {
+    alt = m[1];
+    url = m[2];
+  }
+  if (!url) return null;
+  return { url, alt };
+}
+
+/** True if the main selection intersects [from, to] — used to reveal raw markdown for editing. */
+function selectionIntersectsImage(state: EditorState, from: number, to: number): boolean {
+  const sel = state.selection.main;
+  return sel.from <= to && sel.to >= from;
+}
+
+/**
+ * Build block-level widget decorations for every Image in the document whose
+ * range does NOT intersect the current selection. Same pattern as
+ * `buildTableWidgetDecorations` — block decorations can't come from a ViewPlugin.
+ */
+function buildImageWidgetDecorations(state: EditorState): DecorationSet {
+  ensureSyntaxTree(state, state.doc.length, 50);
+  const decos: Range<Decoration>[] = [];
+  let foundImages = 0;
+  let skippedBySelection = 0;
+  syntaxTree(state).iterate({
+    enter: (ref) => {
+      if (ref.name !== 'Image') return;
+      foundImages++;
+      if (selectionIntersectsImage(state, ref.from, ref.to)) {
+        skippedBySelection++;
+        return;
+      }
+      const parsed = parseImageNode(state, ref);
+      if (!parsed) {
+        console.warn('[imageWidget] could not parse Image node at', ref.from, ref.to);
+        return;
+      }
+      const resolved = resolveImageSrc(parsed.url);
+      console.log('[imageWidget] emit widget at', ref.from, '-', ref.to, 'url=', parsed.url, 'resolved=', resolved);
+      decos.push(
+        Decoration.replace({
+          widget: new ImageWidget(resolved, parsed.alt),
+          block: true,
+        }).range(ref.from, ref.to),
+      );
+    },
+  });
+  if (foundImages > 0) {
+    console.log('[imageWidget] foundImages=', foundImages, 'skippedBySelection=', skippedBySelection, 'decorations=', decos.length);
+  }
+  return Decoration.set(decos, true);
+}
+
+/** StateField providing block-level image widget decorations. */
+export const imageWidgetField = StateField.define<DecorationSet>({
+  create(state) {
+    return buildImageWidgetDecorations(state);
+  },
+  update(value, tr) {
+    const prev = tr.startState.selection.main;
+    const next = tr.selection?.main ?? prev;
+    const selChanged = prev.from !== next.from || prev.to !== next.to;
+    const vpChanged = tr.effects.some((e) => e.is(imageViewportEffect));
+    if (tr.docChanged || selChanged || vpChanged) {
+      return buildImageWidgetDecorations(tr.state);
+    }
+    return value;
+  },
+  provide: (f) => EditorView.decorations.from(f),
+});
+
+/**
+ * Effect dispatched by {@link imageViewportPlugin} when the viewport changes.
+ * Mirrors {@link tableViewportEffect} — without this, scrolling new images
+ * into view wouldn't rebuild the widget.
+ */
+const imageViewportEffect = StateEffect.define<void>();
+
+/** ViewPlugin that re-dispatches viewport changes as an effect for the StateField. */
+export const imageViewportPlugin = ViewPlugin.fromClass(
+  class {
+    update(u: ViewUpdate) {
+      if (u.viewportChanged) {
+        u.view.dispatch({ effects: imageViewportEffect.of() });
+      }
+    }
+  },
+);
 
 // ─── Syntax tree helpers ─────────────────────────────────────────
 
@@ -587,7 +702,7 @@ function buildDecorations(view: EditorView, mode: LivePreviewMode): DecorationSe
         if (ref.name === 'Strikethrough') return decorateStrikethrough(ref, decos);
         if (ref.name === 'Table') return decorateTable(ref, decos);
         if (ref.name === 'TaskList') return decorateTaskList(state, ref, decos);
-        if (ref.name === 'Image') return decorateImage(ref, decos);
+        if (ref.name === 'Image') return decorateImage(view, ref, decos);
       },
     });
   }

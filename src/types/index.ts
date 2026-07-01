@@ -21,6 +21,18 @@ export interface FileResult {
   error?: string;
 }
 
+// ─── Image Types ────────────────────────────────────────────────
+export interface ImageSaveBufferPayload {
+  ext: string;
+  base64: string;
+}
+
+export interface ImageImportResult {
+  success: boolean;
+  relPath?: string;
+  error?: string;
+}
+
 // ─── Theme Types ────────────────────────────────────────────────
 export type ThemeMode = 'system' | 'light' | 'dark';
 

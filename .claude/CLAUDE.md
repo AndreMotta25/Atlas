@@ -6,13 +6,13 @@ Aplicação desktop construída com Electron, usando Webpack como bundler e Type
 
 ## Stack
 
-| Tecnologia         | Papel                             |
-| ------------------ | --------------------------------- |
-| **Electron**       | Framework desktop multiplataforma |
-| **TypeScript**     | Tipagem estática                  |
-| **Webpack**        | Module bundler                    |
-| **Electron Forge** | Build, package e distribuição     |
-| **React**          | Interfaces de usuário             |
+| Tecnologia         | Papel                                      |
+| ------------------ | ------------------------------------------ |
+| **Electron**       | Framework desktop multiplataforma          |
+| **TypeScript**     | Tipagem estática                           |
+| **Webpack**        | Module bundler                             |
+| **Electron Forge** | Build, package e distribuição              |
+| **React**          | Interfaces de usuário                      |
 | **TailwindCSS v4** | Estilização utilitária (tema via `@theme`) |
 
 ---
@@ -24,11 +24,6 @@ my-app/
 ├── .claude/
 │   ├── rules/                          # Diretrizes detalhadas (ver seção Rules)
 │   └── skills/                         # Skills de referência para o Claude
-│       ├── electron-ipc-typescript.md
-│       ├── electron-react-tailwind-setup.md
-│       ├── electron-security-hardening.md
-│       ├── electron-native-apis.md
-│       └── react-solid-typescript.md
 ├── .webpack/                           # Gerado pelo Webpack (gitignored)
 ├── src/
 │   ├── components/                     # Componentes React (renderer)
@@ -103,8 +98,6 @@ Não há exceções para essa regra, mesmo que você acredite conhecer a tarefa.
 
 Toda comunicação entre Main e Renderer usa IPC type-safe com Zod para validação.
 
-> 📖 **Ver skill:** `.claude/skills/electron-ipc-typescript.md`
-
 **Resumo do padrão:**
 
 1. Tipos centralizados em `src/types/index.ts`
@@ -120,13 +113,11 @@ file:open-dialog  |  file:save  |  window:minimize  |  app:get-version
 
 ### Restrição CSP importante
 
-O Renderer **não pode** fazer `fetch()` direto para APIs externas. Toda chamada externa passa pelo Main Process via IPC. Ver skill de IPC para o padrão completo.
+O Renderer **não pode** fazer `fetch()` direto para APIs externas. Toda chamada externa passa pelo Main Process via IPC.
 
 ---
 
 ## Setup Inicial (React + Tailwind v4)
-
-> 📖 **Ver skills:** `.claude/skills/electron-react-tailwind-setup.md`, `.claude/skills/dark-mode-tailwind-v4.md`
 
 Checklist de configuração em ordem obrigatória:
 
@@ -146,29 +137,29 @@ Em v4 o `tailwind.config.js` foi removido. **Toda cor/utility registrada para o 
 Para suportar dark mode com troca em runtime via classe `.dark` no `<html>`, usar `@theme inline` religando as variáveis-base:
 
 ```css
-@import 'tailwindcss';
+@import "tailwindcss";
 @custom-variant dark (&:where(.dark, .dark *));
 
 /* Religa as variáveis-base ao Tailwind — gera utilidades e troca com .dark */
 @theme inline {
-  --color-background:         var(--background);
-  --color-border:             var(--border);
-  --color-foreground:         var(--foreground);
-  --color-muted-foreground:   var(--muted-foreground);
+  --color-background: var(--background);
+  --color-border: var(--border);
+  --color-foreground: var(--foreground);
+  --color-muted-foreground: var(--muted-foreground);
   /* …demais tokens… */
 }
 
 /* Valores concretos por tema */
 :root {
   --background: #ffffff;
-  --border:     #e2e8f0;
+  --border: #e2e8f0;
   --foreground: #0f172a;
   /* … */
 }
 
 .dark {
   --background: #1e1e1e;
-  --border:     #333333;
+  --border: #333333;
   --foreground: #dcddde;
   /* … */
 }
@@ -177,6 +168,7 @@ Para suportar dark mode com troca em runtime via classe `.dark` no `<html>`, usa
 Agora `bg-background`, `border-border`, `text-foreground` etc. são geradas e refletem `.dark` automaticamente.
 
 **Sintomas de tema mal-configurado (tokens fora do `@theme`):**
+
 - Utilidades como `border-border`/`bg-background` não aplicam cor
 - Bordas aparecem em `currentColor` (quase branco em dark mode)
 - Cores não trocam ao aplicar `.dark`
@@ -185,7 +177,7 @@ Se ver qualquer um desses, verificar se o bloco `@theme inline` existe e cobre o
 
 ### Integração com `nativeTheme` (Electron)
 
-A classe `.dark` no `<html>` deve espelhar o `nativeTheme` do Main. Ver skill `dark-mode-electron-tailwind-v4.md` para o fluxo completo: handler IPC `theme:*` → `useTheme()` hook → aplicação da classe no `document.documentElement`.
+A classe `.dark` no `<html>` deve espelhar o `nativeTheme` do Main via IPC: handler `theme:*` → `useTheme()` hook → aplicação da classe no `document.documentElement`.
 
 ---
 
@@ -212,8 +204,6 @@ import { X } from "../../components/Component";
 **Evitar `any` — usar `unknown` quando necessário.**
 
 ### Componentes React
-
-> 📖 **Ver skill:** `.claude/skills/react-solid-typescript.md`
 
 **Regras de criação de componentes:**
 
@@ -257,6 +247,64 @@ src/components/
 │   ├── user_avatar.tsx      # subcomponente
 │   └── user_card.css        # estilos específicos (opcional)
 └── sidebar_menu.tsx
+```
+
+## Abstração de Bibliotecas de Terceiros
+
+Componentes importantes que dependem de bibliotecas externas devem ser encapsulados atrás de uma interface própria. Isso desacopla o restante da aplicação da lib concreta e facilita a troca futura.
+
+**Quando aplicar:** editores de texto, gráficos, date pickers, drag-and-drop, rich text, mapas — qualquer lib com API proprietária e não-trivial.
+
+```typescript
+// ✅ Defina uma interface que representa o contrato do componente
+interface EditorProps {
+  value: string;
+  onChange: (value: string) => void;
+  language?: string;
+  readOnly?: boolean;
+}
+
+// Implementação concreta com CodeMirror — isolada aqui
+const Editor: React.FC<EditorProps> = ({ value, onChange, language, readOnly }) => {
+  // uso interno do CodeMirror
+  return <CodeMirrorEditor ... />;
+};
+
+// O restante da aplicação depende só de EditorProps, nunca do CodeMirror diretamente
+<Editor value={code} onChange={setCode} language="typescript" />
+```
+
+Se precisar trocar de lib, apenas a implementação interna do `Editor` muda — nenhum componente consumidor precisa ser alterado.
+
+---
+
+## Reuso de Componentes
+
+Antes de criar qualquer componente novo:
+
+1. Verifique se já existe algo equivalente em `src/components/`
+2. Se existir, prefira estender via props ou composição (ver OCP na skill SOLID)
+3. Só crie um componente novo se não houver nada reutilizável
+
+---
+
+## Escopo de Implementação
+
+Antes de implementar qualquer feature em um componente existente:
+
+1. **Mapear todos os usos** — buscar todos os arquivos que importam ou renderizam o componente:
+
+```bash
+   grep -r "NomeDoComponente" src/
+```
+
+2. **Implementar na fonte, não no consumidor** — a feature deve viver dentro do próprio componente, nunca em quem o usa. Assim, qualquer lugar que renderizar o componente já terá o comportamento automaticamente.
+3. **Confirmar se a feature deve ser opt-in** — se a funcionalidade não faz sentido em todos os contextos, expô-la via prop booleana com padrão seguro:
+
+```typescript
+interface ChatProps {
+  enableContextMenu?: boolean; // false por padrão se opt-in
+}
 ```
 
 ### Nomenclatura Geral
@@ -303,8 +351,6 @@ export class MainClass {
 ---
 
 ## Segurança
-
-> 📖 **Ver skill:** `.claude/skills/electron-security-hardening.md`
 
 Segurança é implementada em camadas — **todas obrigatórias**:
 
@@ -410,8 +456,6 @@ if (process.env.NODE_ENV !== "development") {
 
 ## APIs Nativas Electron
 
-> 📖 **Ver skill:** `.claude/skills/electron-native-apis.md`
-
 | API                                | Caso de uso                         | Arquivo sugerido                   |
 | ---------------------------------- | ----------------------------------- | ---------------------------------- |
 | `requestSingleInstanceLock`        | Garantir apenas 1 instância rodando | `src/index.ts`                     |
@@ -492,6 +536,14 @@ if (!gotLock) {
 ### Chrome DevTools
 
 Processo Renderer: `F12` na janela da aplicação.
+
+---
+
+## Raciocínio sobre Componentes — Ramificações e Cenários
+
+Antes de implementar qualquer componente React, o sub-agent **`@component-analyst`** deve ser invocado.
+
+Ele lê o contexto real do projeto (store, componentes existentes, onde o dado é criado/modificado/deletado) e produz um relatório mapeando todos os cenários em que o componente pode existir: dados alterados ou deletados enquanto ele está montado, ações concorrentes, props desatualizadas e riscos de cleanup. O código só começa depois que o relatório foi produzido.
 
 ---
 
@@ -579,29 +631,6 @@ if (!process.argv.includes("--squirrel-firstrun")) {
   autoUpdater.checkForUpdates();
 }
 ```
-
----
-
-## Rule Files
-
-Diretrizes detalhadas em `.claude/rules/`:
-
-- **ZOD_V4_MIGRATION.md** — Guia de migração para Zod v4
-- **SQLite.md** — Guia de uso do SQLite com Electron
-
-## Skills
-
-Referências técnicas em `.claude/skills/`:
-
-| Skill                                | Cobre                                                                                                                        |
-| ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------- |
-| **electron-ipc-typescript.md**       | IPC type-safe (tipos, Zod, preload, hooks, CSP, broadcasting, performance)                                                   |
-| **electron-react-tailwind-setup.md** | React + TailwindCSS v4 + PostCSS + Webpack passo a passo                                                                     |
-| **dark-mode-tailwind-v4.md**         | `@theme inline`, CSS variables semânticas, `@custom-variant dark`, padrão shadcn/ui                                          |
-| **dark-mode-electron-tailwind-v4.md** | Integração `nativeTheme` ↔ classe `.dark` via IPC + `useTheme` hook                                                         |
-| **electron-security-hardening.md**   | CSP, `safeStorage`, `shell.openExternal`, permissions, navigation guard, DevTools, electronegativity                         |
-| **electron-native-apis.md**          | Single instance, auto-update, deep links, `nativeTheme`, `powerMonitor`, Tray, `globalShortcut`, Notification, `app.getPath` |
-| **react-solid-typescript.md**        | Princípios SOLID aplicados a componentes React com TypeScript                                                                |
 
 ---
 
